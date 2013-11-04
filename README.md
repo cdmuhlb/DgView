@@ -3,7 +3,7 @@ DgView
 
 Visualize spectral element data while maintaining a responsive UI.  Expensive
 rendering computations are performed by an [Akka](http://akka.io/) ActorSystem
-that interfaces with `SwingWorker`.  Interpolation to pixels is done with full
+that interfaces with SwingWorker.  Interpolation to pixels is done with full
 spectral accuracy (this interpolation is currently unoptimized, which helps
 emphazie the scalability of the actor-based rendering framework).
 
