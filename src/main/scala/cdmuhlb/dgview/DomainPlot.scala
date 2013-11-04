@@ -5,6 +5,7 @@ import java.awt.geom.AffineTransform
 import java.awt.image.{BufferedImage, AffineTransformOp}
 import java.beans.{PropertyChangeEvent, PropertyChangeListener}
 import javax.swing.SwingWorker
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.swing.{Component, ProgressBar}
 import scala.swing.event.{Key, KeyPressed, MouseEntered, MouseExited, MouseMoved}
@@ -66,10 +67,18 @@ class DomainPlot(dom: Domain, pbar: ProgressBar) extends Component {
     repaint()
   }
 
-  def progressImage(newImg: BufferedImage, spec: RenderSpec): Unit = {
+  def progressImages(images: java.util.List[(PixelPoint, BufferedImage)],
+      spec: RenderSpec): Unit = {
     if (specsMatch(spec)) {
-      imgInProgress = newImg
-      specInProgress = spec
+      if (!validProgress) {
+        imgInProgress = new BufferedImage(spec.map.bounds.width,
+            spec.map.bounds.height, BufferedImage.TYPE_INT_ARGB)
+        specInProgress = spec
+      }
+      val g = imgInProgress.createGraphics
+      for ((origin, img) ← images.asScala) {
+        g.drawImage(img, null, origin.x, origin.y)
+      }
       repaint()
     }
   }

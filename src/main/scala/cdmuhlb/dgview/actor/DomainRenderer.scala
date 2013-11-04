@@ -3,7 +3,6 @@ package cdmuhlb.dgview.actor
 import java.awt.Dimension
 import java.awt.image.BufferedImage
 import javax.swing.SwingWorker
-import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import akka.actor.{ActorSystem, Inbox, Props}
 import cdmuhlb.dgview.{DomainPlot, PixelPoint, RenderSpec}
@@ -28,8 +27,6 @@ class DomainRenderer(plot: DomainPlot) {
   class PaintWorker(seqNum: Int, spec: RenderSpec)
       extends SwingWorker[BufferedImage, (PixelPoint, BufferedImage)] {
     val elements = spec.dom.elements
-    val tmpImg = new BufferedImage(spec.map.bounds.width,
-        spec.map.bounds.height, BufferedImage.TYPE_INT_ARGB)
 
     override def doInBackground(): BufferedImage = {
       val inbox = Inbox.create(RenderSystem.system)
@@ -62,12 +59,7 @@ class DomainRenderer(plot: DomainPlot) {
     override protected def process(chunks:
         java.util.List[(PixelPoint, BufferedImage)]): Unit = {
       if (!isCancelled) {
-        val g = tmpImg.createGraphics
-        for ((origin, img) ← chunks.asScala) {
-          g.drawImage(img, null, origin.x, origin.y)
-          //g.drawString("X", origin.x + 5, origin.y + 5)
-        }
-        plot.progressImage(tmpImg, spec)
+        plot.progressImages(chunks, spec)
       }
     }
 
