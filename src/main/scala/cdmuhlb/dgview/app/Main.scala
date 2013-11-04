@@ -32,7 +32,7 @@ object Main extends SimpleSwingApplication {
     val combo = new ComboBox(elements.head.data.keys.toList) {
       selection.item = plot.getField
       reactions += {
-        case SelectionChanged(box) ⇒ 
+        case SelectionChanged(box) ⇒
           assert(box == this)
           plot.setField(selection.item)
       }

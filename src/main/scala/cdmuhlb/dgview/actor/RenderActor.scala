@@ -35,7 +35,7 @@ class RenderActor extends Actor {
         val imgOpt = if ((width > 0) && (height > 0)) {
           val img = new BufferedImage(width, height,
               BufferedImage.TYPE_INT_ARGB)
-          for (iy ← 0 until height; 
+          for (iy ← 0 until height;
                ix ← 0 until width) {
             val xy = spec.map.pixelToDomainPoint(
                 PixelPoint(pxLo.x + ix, pxLo.y + iy))
