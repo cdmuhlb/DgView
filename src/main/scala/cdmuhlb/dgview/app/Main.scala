@@ -23,7 +23,7 @@ object Main extends SimpleSwingApplication {
   val elements = dataFile.elements
 
   def top = new MainFrame {
-    title = "ScalaSwing main frame"
+    title = s"DgView: $filename"
     val pbar = new ProgressBar
     val dom = Domain(elements.map(dge ⇒
         DomainElement(dge.xMin, dge.yMin, dge.xMax, dge.yMax, dge)))
