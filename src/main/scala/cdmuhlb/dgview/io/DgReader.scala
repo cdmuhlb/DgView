@@ -38,6 +38,15 @@ case class DgElement(nx: Int, ny: Int, coords: Vector[Coord2D],
   val yMax: Double = coords.map(_.y).max
 }
 
+class FhebertDataDir(dir: File) {
+  val pat = """VarsTimestep(\d+).data""".r
+  def domains(): Map[Int, FhebertDataFile] = {
+    require(dir.isDirectory)
+    Map(dir.list.collect{case filename @ pat(time) ⇒
+      (time.toInt → new FhebertDataFile(new File(dir, filename)))}:_*)
+  }
+}
+
 class FhebertDataFile(file: File) {
   private val pat = """# \[(\d+)\] (.*)""".r
 
