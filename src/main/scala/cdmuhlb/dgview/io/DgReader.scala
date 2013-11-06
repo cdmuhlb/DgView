@@ -2,8 +2,8 @@ package cdmuhlb.dgview.io
 
 import java.io.File
 import scala.annotation.tailrec
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.immutable.SortedMap
 import scala.io.Source
 import cdmuhlb.dgview.spectral.LegendreGaussLobatto
 
@@ -40,9 +40,9 @@ case class DgElement(nx: Int, ny: Int, coords: Vector[Coord2D],
 
 class FhebertDataDir(dir: File) {
   val pat = """VarsTimestep(\d+).data""".r
-  def domains(): Map[Int, FhebertDataFile] = {
+  def domains(): SortedMap[Int, FhebertDataFile] = {
     require(dir.isDirectory)
-    Map(dir.list.collect{case filename @ pat(time) ⇒
+    SortedMap(dir.list.collect{case filename @ pat(time) ⇒
       (time.toInt → new FhebertDataFile(new File(dir, filename)))}:_*)
   }
 }

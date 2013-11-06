@@ -3,15 +3,15 @@ package cdmuhlb.dgview.app
 import java.io.File
 import javax.swing.UIManager
 import scala.swing.{BorderPanel, MainFrame, Orientation, ProgressBar, SimpleSwingApplication}
-import scala.swing.{Action, Button, ComboBox, FlowPanel, Label, TextField}
+import scala.swing.{Action, BoxPanel, Button, ComboBox, FlowPanel, Label, TextField}
 import scala.swing.event.SelectionChanged
 import com.typesafe.config.ConfigFactory
-import cdmuhlb.dgview.{ContourLinearColorMap, DivergingLinearColorMap, Domain, DomainElement, DomainPlot}
-import cdmuhlb.dgview.io.FhebertDataFile
+import cdmuhlb.dgview.{ContourLinearColorMap, DivergingLinearColorMap, Domain, DomainElement, DomainSeq, DomainPlot}
+import cdmuhlb.dgview.io.{FhebertDataDir, FhebertDataFile}
 
 object Main extends SimpleSwingApplication {
   val conf = ConfigFactory.load().getConfig("dgview")
-  val filename = conf.getString("domain-file")
+  val domDir = new File(conf.getString("domain-dir"))
   if (conf.hasPath("laf")) {
     val laf = conf.getString("laf")
     try UIManager.setLookAndFeel(laf)
@@ -19,17 +19,25 @@ object Main extends SimpleSwingApplication {
       case e: Exception ⇒ Console.err.println(s"Invalid L&F: $laf")
     }
   }
-  val dataFile = new FhebertDataFile(new File(filename))
-  val elements = dataFile.elements
+  val doms = DomainSeq(new FhebertDataDir(domDir))
 
   def top = new MainFrame {
-    title = s"DgView: $filename"
+    title = s"DgView: ${domDir.getCanonicalPath}"
     val pbar = new ProgressBar
-    val dom = Domain(elements.map(dge ⇒
-        DomainElement(dge.xMin, dge.yMin, dge.xMax, dge.yMax, dge)))
-    val plot = new DomainPlot(dom, pbar)
+    val plot = new DomainPlot(doms, pbar)
 
-    val combo = new ComboBox(elements.head.data.keys.toList) {
+    val labTime = new Label("Timestep:")
+    val timeCombo = new ComboBox(doms.times.toList) {
+      selection.item = plot.getTimestep
+      reactions += {
+        case SelectionChanged(box) ⇒
+          assert(box == this)
+          plot.setTimestep(selection.item)
+      }
+      listenTo(selection)
+    }
+    val labField = new Label("Field:")
+    val fieldCombo = new ComboBox(doms.fields) {
       selection.item = plot.getField
       reactions += {
         case SelectionChanged(box) ⇒
@@ -67,8 +75,14 @@ object Main extends SimpleSwingApplication {
     })
 
     contents = new BorderPanel {
-      add(new FlowPanel {
-          contents += combo
+      add(new BoxPanel(Orientation.Vertical) {
+        contents += new FlowPanel {
+          contents += labTime
+          contents += timeCombo
+          contents += labField
+          contents += fieldCombo
+        }
+        contents += new FlowPanel {
           contents += lab1
           contents += txt1
           contents += lab2
@@ -76,7 +90,7 @@ object Main extends SimpleSwingApplication {
           contents += lab3
           contents += txt3
           contents += button
-        }, BorderPanel.Position.North)
+        }}, BorderPanel.Position.North)
       add(plot, BorderPanel.Position.Center)
       add(pbar, BorderPanel.Position.South)
     }

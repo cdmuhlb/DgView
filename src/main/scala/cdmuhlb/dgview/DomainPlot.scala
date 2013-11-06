@@ -11,7 +11,7 @@ import scala.swing.event.{Key, KeyPressed, MouseEntered, MouseExited, MouseMoved
 import akka.actor.{ActorSystem, Inbox, Props}
 import cdmuhlb.dgview.actor.DomainRenderer
 
-class DomainPlot(dom: Domain, pbar: ProgressBar) extends Component
+class DomainPlot(doms: DomainSeq, pbar: ProgressBar) extends Component
     with RenderingRecipient {
   private val renderer = new DomainRenderer(this)
 
@@ -24,10 +24,22 @@ class DomainPlot(dom: Domain, pbar: ProgressBar) extends Component
   private var imgInProgress: BufferedImage = null
   private var specInProgress: RenderSpec = null
 
-  private var field = dom.elements.head.data.data.keys.head
+  private var timestep = doms.times.head
+  private var dom = doms.domains(timestep)
+  def getTimestep: Int = timestep
+  def setTimestep(ts: Int): Unit = {
+    require(doms.times.contains(ts))
+    if (ts != timestep) {
+      timestep = ts
+      dom = doms.domains(timestep)
+      reset()
+    }
+  }
+
+  private var field = doms.fields.head
   def getField: String = field
   def setField(f: String) = {
-    require(dom.elements.head.data.data.contains(f))
+    require(doms.fields.contains(f))
     if (f != field) {
       field = f
       reset()
