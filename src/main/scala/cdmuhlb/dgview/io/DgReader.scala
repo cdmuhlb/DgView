@@ -1,12 +1,15 @@
 package cdmuhlb.dgview.io
 
-import java.io.{BufferedReader, File, FileReader, PrintWriter}
+import java.io.File
+import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.io.Source
 import cdmuhlb.dgview.spectral.LegendreGaussLobatto
 
 case class Coord2D(x: Double, y: Double)
 
-case class DataPoint2D(coords: Coord2D, data: Map[String, Double])
+case class DataPoint2D(coords: Coord2D, data: Map[Int, Double])
 
 case class DgElement(nx: Int, ny: Int, coords: Vector[Coord2D],
     data: Map[String, Vector[Vector[Double]]]) {
@@ -36,72 +39,90 @@ case class DgElement(nx: Int, ny: Int, coords: Vector[Coord2D],
 }
 
 class FhebertDataFile(file: File) {
-  def elements(): Vector[DgElement] = {
-    val in = new BufferedReader(new FileReader(file))
+  private val pat = """# \[(\d+)\] (.*)""".r
 
-    def nextLine(): String = {
-      val line = in.readLine()
-      if (line == null) ""
-      else if (line.nonEmpty && (line.head == '#')) nextLine()
-      else line.trim
+  def elements(): Vector[DgElement] = {
+    @tailrec
+    def parseHeader(lines: List[String], ans: Map[Int, String]):
+        (List[String], Map[Int, String]) = lines match {
+      case pat(colNum, fieldName) :: tail ⇒
+        parseHeader(tail, ans + (colNum.toInt → fieldName))
+      case _ ⇒ (lines, ans)
     }
 
     def parseLine(line: String): DataPoint2D = {
       val fields = line.split("\\s+")
       val x = fields(2).toDouble
       val y = fields(3).toDouble
-      var data = Map.empty[String, Double]
+      var data = Map.empty[Int, Double]
       for (i ← 4 until fields.length) {
-        data += (s"Field_${i+1}" → fields(i).toDouble)
+        data += ((i+1) → fields(i).toDouble)
       }
-      DataPoint2D(Coord2D(x, y), data.toMap)
+      DataPoint2D(Coord2D(x, y), data)
     }
-
-    def readRow(): Vector[DataPoint2D] = {
-      var ans = Vector.empty[DataPoint2D]
-      var line = nextLine()
-      while (line.nonEmpty) {
-        ans :+= parseLine(line)
-        line = nextLine()
-      }
-      ans
+    
+    @tailrec
+    def parseRow(lines: List[String], ans: Vector[DataPoint2D]): (
+        List[String], Vector[DataPoint2D]) = lines match {
+      case head :: tail ⇒
+        if (head.nonEmpty) parseRow(tail, ans :+ parseLine(head.trim))
+        else (tail, ans)
+      case Nil ⇒ (Nil, ans)
     }
-
-    def readElement(): Option[DgElement] = {
+    
+    def parseElement(lines: List[String], header: Map[Int, String]):
+        (List[String], DgElement) = {
       var coords = Vector.empty[Coord2D]
       var data = scala.collection.mutable.Map.empty[String,
           ArrayBuffer[Vector[Double]]]
-      var row = readRow()
-      if (row.isEmpty) None
-      else {
-        var ny = 0
-        val nx = row.length
-        while (row.nonEmpty) {
-          assert(row.length == nx)
-          ny += 1
-          for (dp ← row) {
-            coords :+= dp.coords
-            for ((k, v) ← dp.data) {
-              if (!data.isDefinedAt(k)) data(k) =
-                  ArrayBuffer.empty[Vector[Double]]
-              if (data(k).length < ny) data(k) += Vector.empty[Double]
-              data(k)(ny-1) :+= v
-            }
+      var myLines = lines
+      var row = {
+        val (tmpLines, tmpRow) = parseRow(myLines, Vector.empty[DataPoint2D])
+        myLines = tmpLines
+        tmpRow
+      }
+      assert(row.nonEmpty)
+      var ny = 0
+      val nx = row.length
+      while (row.nonEmpty) {
+        assert(row.length == nx)
+        ny += 1
+        for (dp ← row) {
+          coords :+= dp.coords
+          for ((k, v) ← dp.data) {
+            val ks = header(k)
+            if (!data.isDefinedAt(ks)) data(ks) =
+                ArrayBuffer.empty[Vector[Double]]
+            if (data(ks).length < ny) data(ks) += Vector.empty[Double]
+            data(ks)(ny-1) :+= v
           }
-          row = readRow()
         }
-        Some(DgElement(nx, ny, coords, data.mapValues(_.toVector).toMap))
+        row = {
+          val (tmpLines, tmpRow) =
+              parseRow(myLines, Vector.empty[DataPoint2D])
+          myLines = tmpLines
+          tmpRow
+        }
+      }
+      (myLines, DgElement(nx, ny, coords, data.mapValues(_.toVector).toMap))
+    }
+    
+    val src = Source.fromFile(file)
+    var lines = src.getLines.toList
+    val header = {
+      val (tmpLines, tmpHeader) = parseHeader(lines, Map.empty[Int, String])
+      lines = tmpLines
+      tmpHeader
+    }
+    var ans = Vector.empty[DgElement]
+    while (lines.nonEmpty) {
+      ans :+= {
+        val (tmpLines, tmpElem) = parseElement(lines, header)
+        lines = tmpLines
+        tmpElem
       }
     }
-
-    var ans = Vector.empty[DgElement]
-    var elem = readElement()
-    while (elem.nonEmpty) {
-      ans :+= elem.get
-      elem = readElement()
-    }
-
-    in.close()
+    src.close()
     ans
   }
 }
