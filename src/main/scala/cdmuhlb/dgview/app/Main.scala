@@ -7,6 +7,7 @@ import scala.swing.{Action, BoxPanel, Button, ComboBox, FlowPanel, Label, TextFi
 import scala.swing.event.SelectionChanged
 import com.typesafe.config.ConfigFactory
 import cdmuhlb.dgview.{ContourLinearColorMap, DivergingLinearColorMap, Domain, DomainElement, DomainSeq, DomainPlot}
+import cdmuhlb.dgview.{ColorMapFactory, BlackbodyFactory, GammaGrayLinearFactory, DivergingLinearFactory}
 import cdmuhlb.dgview.io.{FhebertDataDir, FhebertDataFile}
 
 object Main extends SimpleSwingApplication {
@@ -36,6 +37,7 @@ object Main extends SimpleSwingApplication {
       }
       listenTo(selection)
     }
+
     val labField = new Label("Field:")
     val fieldCombo = new ComboBox(doms.fields) {
       selection.item = plot.getField
@@ -46,6 +48,19 @@ object Main extends SimpleSwingApplication {
       }
       listenTo(selection)
     }
+
+    val labColor = new Label("Colormap:")
+    val colorCombo = new ComboBox(List[ColorMapFactory](
+        BlackbodyFactory, DivergingLinearFactory, GammaGrayLinearFactory)) {
+      selection.item = plot.getColorMap.map.getFactory
+      reactions += {
+        case SelectionChanged(box) ⇒
+          assert(box == this)
+          plot.setColorMap(plot.getColorMap.withFactory(selection.item))
+      }
+      listenTo(selection)
+    }
+
     val lab1 = new Label("Z-min:")
     val txt1 = new TextField(4)
     val lab2 = new Label("Z-max:")
@@ -63,8 +78,8 @@ object Main extends SimpleSwingApplication {
         val hi = txt2.text.toDouble
         val nContours = txt3.text.toInt
         if ((hi > lo) && (nContours > 1)) {
-          plot.setColorMap(ContourLinearColorMap(lo, hi, nContours,
-              DivergingLinearColorMap(lo, hi)))
+          plot.setColorMap(plot.getColorMap.getFactory.createMap(
+              lo, hi).withContours(nContours))
         } else {
           Console.err.println("Invalid colormap parameters")
         }
@@ -81,6 +96,8 @@ object Main extends SimpleSwingApplication {
           contents += timeCombo
           contents += labField
           contents += fieldCombo
+          contents += labColor
+          contents += colorCombo
         }
         contents += new FlowPanel {
           contents += lab1
