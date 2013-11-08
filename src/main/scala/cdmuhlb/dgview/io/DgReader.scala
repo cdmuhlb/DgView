@@ -27,9 +27,50 @@ case class DgElement(nx: Int, ny: Int, coords: Vector[Coord2D],
     val topoX = (2.0*(x - xMin)/(xMax - xMin) - 1.0).max(-1.0).min(1.0)
     val topoY = (2.0*(y - yMin)/(yMax - yMin) - 1.0).max(-1.0).min(1.0)
 
+    // Cardinal function interpolation appears to be faster than Fornberg
+    // interpolation for single points.
     data(field).map(_.zipWithIndex.map{case (z, i) ⇒
         z*xBasis.cardinal(i, topoX)}.sum).zipWithIndex.map{case (z, j) ⇒
         z*yBasis.cardinal(j, topoY)}.sum
+  }
+
+  def interpolateToGrid(field: String, xs: Vector[Double],
+      ys: Vector[Double]): Vector[Vector[Double]] = {
+    // Clamp to reference element
+    val topoXs = xs.map(x ⇒
+        (2.0*(x - xMin)/(xMax - xMin) - 1.0).max(-1.0).min(1.0))
+    val topoYs = ys.map(y ⇒
+        (2.0*(y - yMin)/(yMax - yMin) - 1.0).max(-1.0).min(1.0))
+
+    val xMat = xBasis.interpolationMatrix(topoXs)
+    val yMat = yBasis.interpolationMatrix(topoYs)
+
+    def transpose(mat: Vector[Vector[Double]]): Vector[Vector[Double]] = {
+      (for (i ← 0 until mat.head.length) yield {
+        (for (j ← 0 until mat.length) yield mat(j)(i)).toVector
+      }).toVector
+    }
+    def ddot(v1: Vector[Double], v2: Vector[Double]): Double = {
+      assert(v1.length == v2.length)
+      v1.zip(v2).map{case (a, b) ⇒ a*b}.sum
+    }
+    def dgemv(mat: Vector[Vector[Double]],
+        vec: Vector[Double]): Vector[Double] = {
+      assert(mat.length > 0)
+      assert(mat.head.length == vec.length)
+      mat.map(row ⇒ ddot(row, vec))
+    }
+    def dgemm(m1: Vector[Vector[Double]],
+        m2: Vector[Vector[Double]]): Vector[Vector[Double]] = {
+      assert(m1.length > 0)
+      assert(m1.head.length == m2.length)
+      val m2t = transpose(m2)
+      m1.map(r ⇒ m2t.map(c ⇒ ddot(r, c)))
+    }
+
+    val ans = dgemm(yMat, data(field).map(dgemv(xMat, _)))
+    assert((ans.length == ys.length) && (ans.head.length == xs.length))
+    ans
   }
 
   val xMin: Double = coords.map(_.x).min
