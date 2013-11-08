@@ -33,6 +33,30 @@ trait LegendreElement extends QuadratureElement1D {
     require((x >= -1.0) && (x <= 1.0))
     LegendrePolynomials.p(n, x)
   }
+
+  def interpolationMatrix(x: Vector[Double]): Vector[Vector[Double]] = {
+    val ans = Array.ofDim[Double](x.length, nNodes)
+    for (row <- 0 until x.length) {
+      assert((x(row) >= -1.0) && (x(row) <= 1.0))
+      // from SpEC:Utils/Math/InterpolationWeights.cpp
+      var c1 = 1.0
+      var c4 = nodes(0) - x(row)
+      ans(row)(0) = 1.0
+      for (i <- 1 until nNodes) {
+        var c2 = 1.0
+        val c5 = c4
+        c4 = nodes(i) - x(row)
+        for (j <- 0 until i) {
+          val c3 = nodes(i) - nodes(j)
+          c2 *= c3
+          if (j == i-1) ans(row)(i) = -c1*c5*ans(row)(i-1)/c2
+          ans(row)(j) = c4*ans(row)(j)/c3
+        }
+        c1 = c2
+      }
+    }
+    ans.map(_.toVector).toVector
+  }
 }
 
 object LegendreElement {
