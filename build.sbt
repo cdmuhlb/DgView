@@ -13,6 +13,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % "2.2.3"
 )
 
+autoAPIMappings := true
+
 fork := true
 
 outputStrategy := Some(StdoutOutput)
