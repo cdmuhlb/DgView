@@ -78,8 +78,9 @@ object Main extends SimpleSwingApplication {
         val hi = txt2.text.toDouble
         val nContours = txt3.text.toInt
         if ((hi > lo) && (nContours > 1)) {
+          val colorFactory = plot.getColorMap.map.getFactory
           plot.setColorMap(plot.getColorMap.getFactory.createMap(
-              lo, hi).withContours(nContours))
+              lo, hi).withContours(nContours).withFactory(colorFactory))
         } else {
           Console.err.println("Invalid colormap parameters")
         }
