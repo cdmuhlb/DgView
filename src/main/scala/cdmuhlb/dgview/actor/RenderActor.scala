@@ -32,11 +32,14 @@ object RenderActor {
     * intended to be sent in response to a rendering request.
     *
     * Thread safety: Instances of this class are meant to be effectively
-    * immutable.  The thread constructing this class must not mutate the image
-    * once the message has been constructed, and recipients of this class assume
-    * full responsibility for synchronizing access to the image should they
-    * choose to publish it.  Subclasses must respect the effective immutability
-    * of this class's interface.
+    * immutable during their lifetime while representing a transfer of ownership
+    * of mutable data.  In particular, the thread constructing this class must
+    * not mutate the image once the message has been constructed, must only
+    * publish this message to a single recipient, and must not access or publish
+    * the image once this message has been published.  Recipients of this class
+    * assume full responsibility for synchronizing access to the image should
+    * they choose to publish it further.  Subclasses must respect the effective
+    * immutability of this class's interface.
     *
     * @constructor Create a new Rendering message
     * @param seqNum sequence number of the request being responded to
