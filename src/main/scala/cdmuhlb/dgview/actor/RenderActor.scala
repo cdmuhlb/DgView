@@ -9,7 +9,43 @@ import com.typesafe.config.Config
 import cdmuhlb.dgview.{DomainBounds, DomainElement, RenderSpec, PixelPoint}
 
 object RenderActor {
+  /** A message requesting that an element be rendered to a `BufferedImage`
+    * according to a [[RenderSpec]].  Responses to this message
+    * should be instances of [[Rendering]].
+    *
+    * The sequence number represents the priority of this message.  If a
+    * recipient has already processed messages with higher sequence numbers, it
+    * may choose to discard this request.
+    *
+    * Thread safety: Instances of this class are immutable and therefore
+    * thread-safe in all contexts.  Subclasses must respect the immutability of
+    * this class's interface.
+    *
+    * @constructor Create a new Render message
+    * @param seqNum sequence number for the request
+    * @param spec specification for the desired rendering
+    * @param elem spectral element whose data is to be rendered
+    */
   case class Render(seqNum: Int, spec: RenderSpec, elem: DomainElement)
+
+  /** A message containing a rendered image (in the form of a `BufferedImage`),
+    * intended to be sent in response to a rendering request.
+    *
+    * Thread safety: Instances of this class are meant to be effectively
+    * immutable.  The thread constructing this class must not mutate the image
+    * once the message has been constructed, and recipients of this class assume
+    * full responsibility for synchronizing access to the image should they
+    * choose to publish it.  Subclasses must respect the effective immutability
+    * of this class's interface.
+    *
+    * @constructor Create a new Rendering message
+    * @param seqNum sequence number of the request being responded to
+    * @param elem spectral element whose data has been rendered
+    * @param origin location of the upper-left corner of the rendered image
+    *                relative to that of the global image
+    * @param imgOpt [[scala.Option]] containing the rendered image, or
+    *                [[scala.None]] if the image could not be rendered
+    */
   case class Rendering(seqNum: Int, elem: DomainElement, origin: PixelPoint,
       imgOpt: Option[BufferedImage])
 }
