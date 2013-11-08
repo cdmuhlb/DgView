@@ -74,11 +74,15 @@ class RenderActor extends Actor {
         val imgOpt = if ((width > 0) && (height > 0)) {
           val img = new BufferedImage(width, height,
               BufferedImage.TYPE_INT_ARGB)
+
+          val xs = (0 until width).map(ix ⇒ spec.map.pixelToDomainPoint(
+                PixelPoint(pxLo.x + ix, pxLo.y)).x).toVector
+          val ys = (0 until height).map(iy ⇒ spec.map.pixelToDomainPoint(
+                PixelPoint(pxLo.x, pxLo.y + iy)).y).toVector
+          val zs = elem.data.interpolateToGrid(spec.field, xs, ys)
           for (iy ← 0 until height;
                ix ← 0 until width) {
-            val xy = spec.map.pixelToDomainPoint(
-                PixelPoint(pxLo.x + ix, pxLo.y + iy))
-            val z = elem.data.interpolateTo(spec.field, xy.x, xy.y)
+            val z = zs(iy)(ix)
             img.setRGB(ix, iy, spec.colorMap.map(z))
           }
           Some(img)
