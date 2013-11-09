@@ -2,6 +2,7 @@ package cdmuhlb.dgview.spectral
 
 import scala.annotation.tailrec
 import math.{Pi, abs, cos}
+import breeze.linalg.{DenseMatrix}
 
 case class LegendreGauss(nNodes: Int) extends LegendreElement {
   require(nNodes >= 1)
@@ -48,14 +49,14 @@ trait LegendreElement extends QuadratureElement1D {
     LegendrePolynomials.p(n, x)
   }
 
-  def interpolationMatrix(x: Vector[Double]): Vector[Vector[Double]] = {
-    val ans = Array.ofDim[Double](x.length, nNodes)
+  def interpolationMatrix(x: Vector[Double]): DenseMatrix[Double] = {
+    val ans = DenseMatrix.zeros[Double](x.length, nNodes)
     for (row <- 0 until x.length) {
       assert((x(row) >= -1.0) && (x(row) <= 1.0))
       // from SpEC:Utils/Math/InterpolationWeights.cpp
       var c1 = 1.0
       var c4 = nodes(0) - x(row)
-      ans(row)(0) = 1.0
+      ans(row, 0) = 1.0
       for (i <- 1 until nNodes) {
         var c2 = 1.0
         val c5 = c4
@@ -63,13 +64,13 @@ trait LegendreElement extends QuadratureElement1D {
         for (j <- 0 until i) {
           val c3 = nodes(i) - nodes(j)
           c2 *= c3
-          if (j == i-1) ans(row)(i) = -c1*c5*ans(row)(i-1)/c2
-          ans(row)(j) = c4*ans(row)(j)/c3
+          if (j == i-1) ans(row, i) = -c1*c5*ans(row, i-1)/c2
+          ans(row, j) = c4*ans(row, j)/c3
         }
         c1 = c2
       }
     }
-    ans.map(_.toVector).toVector
+    ans
   }
 }
 
