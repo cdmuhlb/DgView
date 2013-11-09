@@ -3,6 +3,7 @@ package cdmuhlb.dgview.app
 import java.beans.{PropertyChangeEvent, PropertyChangeListener}
 import java.io.File
 import javax.swing.{BorderFactory, SwingWorker, UIManager}
+import scala.collection.JavaConverters._
 import scala.swing.{BorderPanel, MainFrame, Orientation, ProgressBar, SimpleSwingApplication}
 import scala.swing.{Action, BoxPanel, Button, ComboBox, FlowPanel, Label, Slider, TextField}
 import scala.swing.FileChooser
@@ -15,6 +16,12 @@ import cdmuhlb.dgview.actor.AnimationWorker
 import cdmuhlb.dgview.io.{FhebertDataDir, FhebertDataFile}
 
 object Main extends SimpleSwingApplication {
+  // Allow netlib-java implementation to be configured via application.conf
+  val netlibConf =  ConfigFactory.load().getConfig("com.github.fommil.netlib")
+  for (k ← netlibConf.root().keySet().asScala) {
+    System.setProperty("com.github.fommil.netlib." + k, netlibConf.getString(k))
+  }
+
   val conf = ConfigFactory.load().getConfig("dgview")
   val domDir = new File(conf.getString("domain-dir"))
   if (conf.hasPath("laf")) {

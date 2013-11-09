@@ -8,11 +8,17 @@ scalaVersion := "2.10.3"
 
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked")
 
-resolvers += "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/"
+resolvers ++= Seq(
+  "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/",
+  "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
+)
 
 libraryDependencies <+= scalaVersion("org.scala-lang" % "scala-swing" % _)
 
-libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.2.3"
+libraryDependencies ++= Seq(
+  "com.typesafe.akka" %% "akka-actor" % "2.2.3",
+  "org.scalanlp" %% "breeze" % "0.5.2"
+)
 
 autoAPIMappings := true
 
