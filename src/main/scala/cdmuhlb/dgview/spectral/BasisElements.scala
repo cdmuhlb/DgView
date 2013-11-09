@@ -3,10 +3,18 @@ package cdmuhlb.dgview.spectral
 import scala.annotation.tailrec
 import math.{Pi, abs, cos}
 
+case class LegendreGauss(nNodes: Int) extends LegendreElement {
+  require(nNodes >= 1)
+  val nMax = nNodes - 1
+  val nodes = LegendreElement.gaussNodes(nNodes)
+  val weights = LegendreElement.gaussWeights(nodes)
+}
+
 case class LegendreGaussLobatto(nNodes: Int) extends LegendreElement {
   require(nNodes >= 2)
   val nMax = nNodes - 2
   val nodes = LegendreElement.gaussLobattoNodes(nNodes)
+  val weights = LegendreElement.gaussLobattoWeights(nodes)
 
   def cardinal(i: Int, x: Double): Double = {
     require((i >= 0) && (i < nNodes))
@@ -24,6 +32,12 @@ case class LegendreGaussLobatto(nNodes: Int) extends LegendreElement {
 trait QuadratureElement1D {
   def nNodes: Int
   def nodes: Vector[Double]
+  def weights: Vector[Double]
+
+  def integrate(y: Vector[Double]): Double = {
+    require(y.length == nNodes)
+    y.zip(weights).map(yw ⇒ yw._1*yw._2).sum
+  }
 }
 
 trait LegendreElement extends QuadratureElement1D {
@@ -74,6 +88,14 @@ object LegendreElement {
     nodes.toVector
   }
 
+   def gaussWeights(nodes: Vector[Double]): Vector[Double] = {
+    val n = nodes.length
+    nodes.map(x ⇒ {
+      val dp = JacobiPolynomials.d1p00(n, x)
+      2.0 / ((1.0 - x*x)*dp*dp)
+    })
+  }
+
   def gaussLobattoNodes(n: Int): Vector[Double] = {
     val solver = new NewtonSolver((x: Double) ⇒ JacobiPolynomials.p11(n - 2, x),
         (x: Double) ⇒ JacobiPolynomials.d1p11(n - 2, x))
@@ -89,6 +111,14 @@ object LegendreElement {
     nodes(0) = -1.0
     nodes(n-1) = 1.0
     nodes.toVector
+  }
+
+  def gaussLobattoWeights(nodes: Vector[Double]): Vector[Double] = {
+    val n = nodes.length
+    nodes.map(x ⇒ {
+      val p = JacobiPolynomials.p00(n - 1, x)
+      2.0 / (n*(n - 1.0)*p*p)
+    })
   }
 }
 
