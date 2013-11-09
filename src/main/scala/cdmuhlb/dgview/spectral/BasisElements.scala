@@ -99,7 +99,7 @@ class NewtonSolver(f: (Double) ⇒ Double, df: (Double) ⇒ Double) {
       import java.lang.Double.MIN_NORMAL
       val xNext = x - f(x)/df(x)
       // Note: Tolerance limit: MIN_VALUE/MIN_NORMAL=2.220446049250313E-16
-      if ((abs(x - xNext) / abs(xNext).max(MIN_NORMAL)) < 5.0e-16) {
+      if ((abs(x - xNext) / abs(xNext).max(MIN_NORMAL)) < 1.0e-15) {
         xNext
       } else newton(xNext)
     }
