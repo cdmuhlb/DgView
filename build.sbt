@@ -17,3 +17,5 @@ autoAPIMappings := true
 fork := true
 
 outputStrategy := Some(StdoutOutput)
+
+packageArchetype.java_application
