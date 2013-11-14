@@ -8,6 +8,18 @@ import akka.dispatch.{Envelope, UnboundedPriorityMailbox}
 import com.typesafe.config.Config
 import cdmuhlb.dgview.{DomainBounds, DomainElement, RenderSpec, PixelPoint}
 
+/** A message wrapper attaching a sequence number to another message.
+  *
+  * The sequence number represents the priority of the message.  If a
+  * recipient has already processed messages with higher sequence numbers, it
+  * may choose to discard this request.
+  *
+  * @constructor Create a new SequencedMessage message
+  * @param seqNum sequence number for the request
+  * @param msg message
+  */
+case class SequencedMessage(seqNum: Int, msg: Any)
+
 object RenderActor {
   /** A message requesting that an element be rendered to a `BufferedImage`
     * according to a [[RenderSpec]].  Responses to this message
@@ -22,11 +34,10 @@ object RenderActor {
     * this class's interface.
     *
     * @constructor Create a new Render message
-    * @param seqNum sequence number for the request
     * @param spec specification for the desired rendering
     * @param elem spectral element whose data is to be rendered
     */
-  case class Render(seqNum: Int, spec: RenderSpec, elem: DomainElement)
+  case class Render(spec: RenderSpec, elem: DomainElement)
 
   /** A message containing a rendered image (in the form of a `BufferedImage`),
     * intended to be sent in response to a rendering request.
@@ -59,50 +70,58 @@ class RenderActor extends Actor {
   var isMaxSeqSet = false
 
   def receive = {
-    case Render(seqNum, spec, elem) ⇒
+    case SequencedMessage(seqNum, Render(spec, elem)) ⇒
       if (!isMaxSeqSet) {
         maxSeq = seqNum
         isMaxSeqSet = true
       }
       if ((seqNum - maxSeq) >= 0) {
-        maxSeq = seqNum
-        val elemBounds = DomainBounds(elem)
-        val pxLo = spec.map.lowerPixelPoint(elemBounds)
-        val pxHi = spec.map.upperPixelPoint(elemBounds)
-        val width = pxHi.x - pxLo.x + 1
-        val height = pxHi.y - pxLo.y + 1
-        val imgOpt = if ((width > 0) && (height > 0)) {
-          val img = new BufferedImage(width, height,
-              BufferedImage.TYPE_INT_ARGB)
-
-          val xs = (0 until width).map(ix ⇒ spec.map.pixelToDomainPoint(
-                PixelPoint(pxLo.x + ix, pxLo.y)).x).toVector
-          val ys = (0 until height).map(iy ⇒ spec.map.pixelToDomainPoint(
-                PixelPoint(pxLo.x, pxLo.y + iy)).y).toVector
-          val zs = elem.data.interpolateToGrid(spec.field, xs, ys)
-          for (iy ← 0 until height;
-               ix ← 0 until width) {
-            val z = zs(iy)(ix)
-            img.setRGB(ix, iy, spec.colorMap.map(z))
-          }
-          Some(img)
-        } else None
-        sender ! Rendering(seqNum, elem, pxLo, imgOpt)
+        val (origin, imgOpt) = render(spec, elem)
+        sender ! Rendering(seqNum, elem, origin, imgOpt)
       }
+    case Render(spec, elem) ⇒
+      val (origin, imgOpt) = render(spec, elem)
+        sender ! Rendering(0, elem, origin, imgOpt)
+  }
+
+  def render(spec: RenderSpec, elem: DomainElement):
+      (PixelPoint, Option[BufferedImage]) = {
+    val elemBounds = DomainBounds(elem)
+    val pxLo = spec.map.lowerPixelPoint(elemBounds)
+    val pxHi = spec.map.upperPixelPoint(elemBounds)
+    val width = pxHi.x - pxLo.x + 1
+    val height = pxHi.y - pxLo.y + 1
+    val imgOpt = if ((width > 0) && (height > 0)) {
+      val img = new BufferedImage(width, height,
+          BufferedImage.TYPE_INT_ARGB)
+
+      val xs = (0 until width).map(ix ⇒ spec.map.pixelToDomainPoint(
+            PixelPoint(pxLo.x + ix, pxLo.y)).x).toVector
+      val ys = (0 until height).map(iy ⇒ spec.map.pixelToDomainPoint(
+            PixelPoint(pxLo.x, pxLo.y + iy)).y).toVector
+      val zs = elem.data.interpolateToGrid(spec.field, xs, ys)
+      for (iy ← 0 until height;
+           ix ← 0 until width) {
+        val z = zs(iy)(ix)
+        img.setRGB(ix, iy, spec.colorMap.map(z))
+      }
+      Some(img)
+    } else None
+    (pxLo, imgOpt)
   }
 }
 
-object RenderComparator extends Comparator[Envelope] {
+object SequenceComparator extends Comparator[Envelope] {
   def compare(e1: Envelope, e2: Envelope): Int = {
     import RenderActor._
     (e1.message, e2.message) match {
-      case (Render(s1, _, _), Render(s2, _, _)) ⇒ s2 - s1
-      case (r: Render, other) ⇒ 1
-      case (other, r: Render) ⇒ -1
+      case (SequencedMessage(s1, _), SequencedMessage(s2, _)) ⇒ s2 - s1
+      case (r: SequencedMessage, other) ⇒ 1
+      case (other, r: SequencedMessage) ⇒ -1
       case (other1, other2) ⇒ 0
     }
   }
 }
 
 class RenderMailbox(settings: ActorSystem.Settings, config: Config)
-    extends UnboundedPriorityMailbox(RenderComparator)
+    extends UnboundedPriorityMailbox(SequenceComparator)
