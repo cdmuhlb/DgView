@@ -12,8 +12,8 @@ object DomainSeq {
 }
 
 case class DomainSeq(domains: SortedMap[Int, Domain]) {
-  def times: SortedSet[Int] = domains.keySet
-  def fields: List[String] = {
+  val times: IndexedSeq[Int] = domains.keySet.toIndexedSeq
+  val fields: List[String] = {
     if (domains.isEmpty) List.empty[String]
     else domains.values.head.fields
   }

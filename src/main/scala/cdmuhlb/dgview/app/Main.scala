@@ -1,10 +1,10 @@
 package cdmuhlb.dgview.app
 
 import java.io.File
-import javax.swing.UIManager
+import javax.swing.{BorderFactory, UIManager}
 import scala.swing.{BorderPanel, MainFrame, Orientation, ProgressBar, SimpleSwingApplication}
-import scala.swing.{Action, BoxPanel, Button, ComboBox, FlowPanel, Label, TextField}
-import scala.swing.event.SelectionChanged
+import scala.swing.{Action, BoxPanel, Button, ComboBox, FlowPanel, Label, Slider, TextField}
+import scala.swing.event.{SelectionChanged, ValueChanged}
 import com.typesafe.config.ConfigFactory
 import cdmuhlb.dgview.{ContourLinearColorMap, DivergingLinearColorMap, Domain, DomainElement, DomainSeq, DomainPlot}
 import cdmuhlb.dgview.{ColorMapFactory, BlackbodyFactory, GammaGrayLinearFactory, DivergingLinearFactory}
@@ -27,17 +27,6 @@ object Main extends SimpleSwingApplication {
     val pbar = new ProgressBar
     val plot = new DomainPlot(doms, pbar)
 
-    val labTime = new Label("Timestep:")
-    val timeCombo = new ComboBox(doms.times.toList) {
-      selection.item = plot.getTimestep
-      reactions += {
-        case SelectionChanged(box) ⇒
-          assert(box == this)
-          plot.setTimestep(selection.item)
-      }
-      listenTo(selection)
-    }
-
     val labField = new Label("Field:")
     val fieldCombo = new ComboBox(doms.fields) {
       selection.item = plot.getField
@@ -59,6 +48,12 @@ object Main extends SimpleSwingApplication {
           plot.setColorMap(plot.getColorMap.withFactory(selection.item))
       }
       listenTo(selection)
+    }
+
+    val labTime = new Label("Timestep:")
+    val txtTime = new TextField(3) {
+      enabled = false
+      text = plot.getTimestep.toString
     }
 
     val lab1 = new Label("Z-min:")
@@ -90,15 +85,31 @@ object Main extends SimpleSwingApplication {
       }
     })
 
+    val slider = new Slider {
+      min = 0
+      max = doms.times.size - 1
+      value = 0
+      majorTickSpacing = 1
+      paintTicks = true
+      reactions += {
+        case ValueChanged(source) ⇒
+          assert(source == this)
+          val time = doms.times(value)
+          txtTime.text = time.toString
+          plot.setTimestep(time)
+      }
+    }
+
     contents = new BorderPanel {
       add(new BoxPanel(Orientation.Vertical) {
+        border = BorderFactory.createEmptyBorder(0, 8, 0, 8)
         contents += new FlowPanel {
-          contents += labTime
-          contents += timeCombo
           contents += labField
           contents += fieldCombo
           contents += labColor
           contents += colorCombo
+          contents += labTime
+          contents += txtTime
         }
         contents += new FlowPanel {
           contents += lab1
@@ -108,7 +119,11 @@ object Main extends SimpleSwingApplication {
           contents += lab3
           contents += txt3
           contents += button
-        }}, BorderPanel.Position.North)
+        }
+        contents += new BorderPanel {
+          add(slider, BorderPanel.Position.Center)
+        }
+      }, BorderPanel.Position.North)
       add(plot, BorderPanel.Position.Center)
       add(pbar, BorderPanel.Position.South)
     }
