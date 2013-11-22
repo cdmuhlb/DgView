@@ -80,7 +80,7 @@ case class DgElement(nx: Int, ny: Int, coords: Vector[Coord2D],
 }
 
 class FhebertDataDir(dir: File) {
-  val pat = """VarsTimestep(\d+).data""".r
+  val pat = """VarsTime(\d+).data""".r
   def domains(): SortedMap[Int, FhebertDataFile] = {
     require(dir.isDirectory)
     SortedMap(dir.list.collect{case filename @ pat(time) ⇒
@@ -102,10 +102,10 @@ class FhebertDataFile(file: File) {
 
     def parseLine(line: String): DataPoint2D = {
       val fields = line.split("\\s+")
-      val x = fields(2).toDouble
-      val y = fields(3).toDouble
+      val x = fields(0).toDouble
+      val y = fields(1).toDouble
       var data = Map.empty[Int, Double]
-      for (i ← 4 until fields.length) {
+      for (i ← 2 until fields.length) {
         data += ((i+1) → fields(i).toDouble)
       }
       DataPoint2D(Coord2D(x, y), data)

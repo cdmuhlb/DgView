@@ -55,7 +55,7 @@ object Main extends SimpleSwingApplication {
     }
 
     val labTime = new Label("Timestep:")
-    val txtTime = new TextField(3) {
+    val txtTime = new TextField(6) {
       enabled = false
       text = plot.getTimestep.toString
     }
