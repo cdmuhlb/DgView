@@ -73,6 +73,7 @@ class DomainPlot(doms: DomainSeq, pbar: ProgressBar) extends Component
       (img != null) && specsMatch(lastSpec)
 
   private def reset(): Unit = {
+    if (worker != null) worker.cancel(true)
     worker = null
     img = null
     imgInProgress = null
