@@ -44,7 +44,7 @@ class DomainRenderer(plot: RenderingRecipient) {
 
       val nRequests = elements.length
       var nResponses = 0
-      while (nResponses < nRequests) {
+      while ((nResponses < nRequests) && !isCancelled) {
         inbox.receive(1.minute) match {
           case RenderActor.Rendering(s, elem, origin, imgOpt) ⇒
             assert(s == seqNum)
