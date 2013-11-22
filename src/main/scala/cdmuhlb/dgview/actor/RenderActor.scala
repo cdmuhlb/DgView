@@ -76,12 +76,13 @@ class RenderActor extends Actor {
         isMaxSeqSet = true
       }
       if ((seqNum - maxSeq) >= 0) {
+        maxSeq = seqNum
         val (origin, imgOpt) = render(spec, elem)
         sender ! Rendering(seqNum, elem, origin, imgOpt)
       }
     case Render(spec, elem) ⇒
       val (origin, imgOpt) = render(spec, elem)
-        sender ! Rendering(0, elem, origin, imgOpt)
+      sender ! Rendering(0, elem, origin, imgOpt)
   }
 
   def render(spec: RenderSpec, elem: DomainElement):
