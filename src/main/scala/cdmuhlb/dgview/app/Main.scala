@@ -13,7 +13,7 @@ import cdmuhlb.dgview.{ContourLinearColorMap, DivergingLinearColorMap, Domain, D
 import cdmuhlb.dgview.{PixelMap, PixelBounds, DomainBounds, RenderSpec}
 import cdmuhlb.dgview.{ColorMapFactory, BlackbodyFactory, GammaGrayLinearFactory, DivergingLinearFactory}
 import cdmuhlb.dgview.actor.AnimationWorker
-import cdmuhlb.dgview.io.{FhebertDataDir, FhebertDataFile}
+import cdmuhlb.dgview.io.{FhebertDataDir, FhebertDataFile, Html5Video}
 
 object Main extends SimpleSwingApplication {
   // Allow netlib-java implementation to be configured via application.conf
@@ -152,8 +152,13 @@ object Main extends SimpleSwingApplication {
                   case ("state", SwingWorker.StateValue.DONE) ⇒
                     ioBar.indeterminate = false
                     ioBar.value = 0
+                    val video = Html5Video(s"frame_${field}_", hRes, vRes, 6)
+                    video.writeConversionScript(new File(dir, "make_html5_video.sh"),
+                        "animation")
                     println("To animate, run:")
                     println(s"$$ convert -delay 20 -loop 0 '${dir}/frame_${field}_'*.png animation.gif")
+                    println("or run:")
+                    println(s"$$ cd '$dir'; bash make_html5_video.sh")
                 }
               }
             }
