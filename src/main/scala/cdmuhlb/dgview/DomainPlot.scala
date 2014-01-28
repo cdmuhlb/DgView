@@ -1,7 +1,7 @@
 package cdmuhlb.dgview
 
-import java.awt.{Color, Dimension, Graphics2D, MouseInfo, Point, Rectangle}
-import java.awt.geom.AffineTransform
+import java.awt.{Color, Dimension, Graphics2D, MouseInfo, Point, Rectangle, RenderingHints}
+import java.awt.geom.{AffineTransform, Ellipse2D}
 import java.awt.image.{BufferedImage, AffineTransformOp}
 import java.beans.{PropertyChangeEvent, PropertyChangeListener}
 import javax.swing.SwingWorker
@@ -169,8 +169,22 @@ class DomainPlot(doms: DomainSeq, pbar: ProgressBar) extends Component
     }
 
     // Draw element borders
-    g.setColor(foreground)
+    val transparentForeground = new Color(foreground.getRed,
+        foreground.getGreen, foreground.getBlue, 95)
     for (elem ← dom.elements) {
+      // Draw points
+      g.setColor(transparentForeground)
+      for (node ← elem.data.coords) {
+        val center = {
+          val tmp = map.domainToRoundedPixelPoint(DomainPoint(node.x, node.y))
+          PixelPoint(map.origin.x + tmp.x, map.origin.y + tmp.y)
+        }
+        g.drawLine(center.x - 1, center.y, center.x + 1, center.y)
+        g.drawLine(center.x, center.y - 1, center.x, center.y + 1)
+      }
+
+      // Draw boundary
+      g.setColor(foreground)
       val rect = {
         val xy0 = map.domainToRoundedPixelPoint(
             DomainPoint(elem.xMin, elem.yMax))
