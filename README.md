@@ -42,11 +42,11 @@ system.  Running `bin/dgview` will execute _DgView_.
 Data format
 -----------
 
-_DgView_ currently reads its data from an ad hoc plain-text file format.  Domains
-must be composed of rectangular elements using a basis of Legendre polynomials.
+_DgView_ currently reads its data from an ad hoc plain-text file format.
+Domains must be composed of 2D rectangular Legendre-Gauss-Lobatto elements.
 These elements may be arbitrarily scaled and shifted and need not conform to
 their neighbors, but they may not be rotated or otherwise have their coordinates
-mapped.
+mapped, and they should not overlap one another.
 
 Each timestep must be stored in a separate file, and the files must be named
 `VarsTime<step_num>.data`, where `<step_num>` is an integer representing the
@@ -70,9 +70,10 @@ An example header might look like:
 Following the header is the data, one line per gridpoint.  Each line is divided
 into columns by whitespace.  Each column contains a floating-point number
 representing the corresponding field in the header.  Data points appear in
-row-major order: left-to-right, top-to-bottom.  Each row of an element (constant
+row-major order: left-to-right, bottom-to-top.  Each row of an element (constant
 y-value) must be separated by a blank line.  Each element must be separated by
-two blank lines.  An example consisting of two 2x3 elements might look like:
+two blank lines, and elements may be listed in any order.  An example consisting
+of two 2x3 elements might look like:
 
     0.0  0.0  1.0  2.0
     0.5  0.0  2.0  8.0
