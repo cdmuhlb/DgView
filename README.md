@@ -13,6 +13,11 @@ _DgView_ is written in Scala and requires an
 [SBT](http://www.scala-sbt.org/) launcher compatible with version 0.13.0 and a
 Java SE 6 (or later) JDK.
 
+_DgView_ can generate scripts to render animations of your data in both GIF and
+HTML5 video formats.  Generating GIFs requires the `convert` tool from
+ImageMagick.  Generating HTML5 video requires `ffmpeg`, `x264`, `MP4Box`, and
+`vpxenc`, in addition to a `bash` shell.
+
 Configuration
 -------------
 
@@ -26,18 +31,18 @@ you encounter JNI errors, try commenting or uncommenting the
 Distribution
 ------------
 
-DgView uses the
+_DgView_ uses the
 [Native Packager Plugin](http://www.scala-sbt.org/sbt-native-packager/) for SBT
 in order to create distributable binaries that only depend on a JVM (SBT and a
 full JDK are not required).  To create such a package, run
 `sbt universal:package-bin`; this will create a file named
 `target/universal/dgview-1.0-SNAPSHOT.zip`, which can be extracted on the target
-system.  Running `bin/dgview` will execute DgView.
+system.  Running `bin/dgview` will execute _DgView_.
 
 Data format
 -----------
 
-DgView currently reads its data from an ad hoc plain-text file format.  Domains
+_DgView_ currently reads its data from an ad hoc plain-text file format.  Domains
 must be composed of rectangular elements using a basis of Legendre polynomials.
 These elements may be arbitrarily scaled and shifted and need not conform to
 their neighbors, but they may not be rotated or otherwise have their coordinates
