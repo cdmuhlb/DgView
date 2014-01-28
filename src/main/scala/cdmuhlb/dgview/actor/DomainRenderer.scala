@@ -111,8 +111,19 @@ class AnimationWorker(specs: Seq[RenderSpec], dir: File)
       }
 
       // Draw element borders
-      g.setColor(Color.BLACK)
+      val transparentBlack = new Color(0, 0, 0, 95)
       for (elem ← elements) {
+        g.setColor(transparentBlack)
+        for (node ← elem.data.coords) {
+          val center = {
+            val tmp = spec.map.domainToRoundedPixelPoint(DomainPoint(node.x, node.y))
+            PixelPoint(spec.map.origin.x + tmp.x, spec.map.origin.y + tmp.y)
+          }
+          g.drawLine(center.x - 1, center.y, center.x + 1, center.y)
+          g.drawLine(center.x, center.y - 1, center.x, center.y + 1)
+        }
+
+        g.setColor(Color.BLACK)
         val rect = {
           val xy0 = spec.map.domainToRoundedPixelPoint(
               DomainPoint(elem.xMin, elem.yMax))
