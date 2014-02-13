@@ -31,6 +31,11 @@ case class Domain(elements: Vector[DomainElement]) {
     if (elements.nonEmpty) elements.head.data.data.keys.toList.sorted
     else List.empty[String]
   }
+
+  def dataRange(field: String): (Double, Double) = {
+    (elements.map(_.data.dataMin(field)).min,
+        elements.map(_.data.dataMax(field)).max)
+  }
 }
 
 case class DomainElement(xMin: Double, yMin: Double,

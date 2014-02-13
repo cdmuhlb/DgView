@@ -68,9 +68,9 @@ object Main extends SimpleSwingApplication {
     }
 
     val lab1 = new Label("Z-min:")
-    val txt1 = new TextField(4)
+    val txt1 = new TextField(6)
     val lab2 = new Label("Z-max:")
-    val txt2 = new TextField(4)
+    val txt2 = new TextField(6)
     val lab3 = new Label("Contours:")
     val txt3 = new TextField(3)
     val cmap0 = plot.getColorMap
@@ -94,6 +94,15 @@ object Main extends SimpleSwingApplication {
         case nfe: NumberFormatException ⇒
           Console.err.println("Invalid colormap parameters")
       }
+    })
+
+    val rangeBtn = new Button(Action("Auto") {
+      val range = plot.getDom.dataRange(plot.getField)
+      val lo = range._1
+      val hi = if (math.abs((lo - range._2)/lo) < 0.001) lo*1.001 else range._2
+      txt1.text = f"$lo%.4g"
+      txt2.text = f"$hi%.4g"
+      button.doClick()
     })
 
     val slider = new Slider {
@@ -184,6 +193,7 @@ object Main extends SimpleSwingApplication {
           contents += txt1
           contents += lab2
           contents += txt2
+          contents += rangeBtn
           contents += lab3
           contents += txt3
           contents += button

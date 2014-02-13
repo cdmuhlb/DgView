@@ -26,6 +26,7 @@ class DomainPlot(doms: DomainSeq, pbar: ProgressBar) extends Component
 
   private var timestep = doms.times.head
   private var dom = doms.domains(timestep)
+  def getDom = dom
   def getTimestep: Int = timestep
   def setTimestep(ts: Int): Unit = {
     require(doms.times.contains(ts))

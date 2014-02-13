@@ -71,6 +71,9 @@ case class DgElement(nx: Int, ny: Int, coords: Vector[Coord2D],
         zMat(i, ::).t(::, 0).toArray.toVector).toVector
   }
 
+  def dataMin(field: String): Double = data(field).map(_.min).min
+  def dataMax(field: String): Double = data(field).map(_.max).max
+
   val xMin: Double = coords.map(_.x).min
   val yMin: Double = coords.map(_.y).min
   val xMax: Double = coords.map(_.x).max
@@ -152,6 +155,7 @@ class FhebertDataFile(file: File) {
           tmpRow
         }
       }
+      // TODO: Reverse data if required
       (myLines, DgElement(nx, ny, coords, data.mapValues(_.toVector).toMap))
     }
     
