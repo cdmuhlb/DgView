@@ -11,7 +11,7 @@ import scala.swing.event.{SelectionChanged, ValueChanged}
 import com.typesafe.config.ConfigFactory
 import cdmuhlb.dgview.{ContourLinearColorMap, DivergingLinearColorMap, Domain, DomainElement, DomainSeq, DomainPlot}
 import cdmuhlb.dgview.{PixelMap, PixelBounds, DomainBounds, RenderSpec}
-import cdmuhlb.dgview.{ColorMapFactory, BlackbodyFactory, GammaGrayLinearFactory, DivergingLinearFactory}
+import cdmuhlb.dgview.{ColorMapFactory, BlackbodyFactory, GammaGrayLinearFactory, DivergingLinearFactory, MshRainbowColorMapFactory}
 import cdmuhlb.dgview.actor.AnimationWorker
 import cdmuhlb.dgview.io.{FhebertDataDir, FhebertDataFile, Html5Video}
 
@@ -51,7 +51,7 @@ object Main extends SimpleSwingApplication {
 
     val labColor = new Label("Colormap:")
     val colorCombo = new ComboBox(List[ColorMapFactory](
-        BlackbodyFactory, DivergingLinearFactory, GammaGrayLinearFactory)) {
+        BlackbodyFactory, DivergingLinearFactory, GammaGrayLinearFactory, MshRainbowColorMapFactory)) {
       selection.item = plot.getColorMap.map.getFactory
       reactions += {
         case SelectionChanged(box) ⇒

@@ -122,6 +122,23 @@ case class DivergingLinearColorMap(lo: Double, hi: Double) extends ColorMap {
   def getFactory = DivergingLinearFactory
 }
 
+object MshRainbowColorMapFactory extends ColorMapFactory {
+  def createMap(lo: Double, hi: Double) = MshRainbowColorMap(lo, hi)
+  override def toString(): String = "MshRainbow"
+}
+
+case class MshRainbowColorMap(lo: Double, hi: Double) extends ColorMap {
+  def map(z: Double): Int = {
+    val hLo = 5.5
+    val hHi = 0.33
+    val zNorm = (2.0*(z - lo)/(hi - lo) - 1.0).max(-1.0).min(1.0)
+    val msh = MshColor(96.0, 0.75, hLo + (hHi - hLo)*0.5*(zNorm + 1.0))
+    val (cr, cg, cb) = ColorSpaceConversion.mshToSRgb(msh).toBytes
+    (0xff<<24) | (cr<<16) | (cg<<8) | cb
+  }
+  def getFactory = MshRainbowColorMapFactory
+}
+
 
 object ColorSpaceInterpolation {
   def mshGradient(c1: MshColor, c2: MshColor, x: Double): MshColor = {
