@@ -1,7 +1,7 @@
 package cdmuhlb.dgview
 
 import scala.math.{acos, atan2, cbrt, cos, pow, sin, sqrt}
-import cdmuhlb.dgview.color.{ColorSpaceConversion, SRgbColor, CieXyzColor, MshColor}
+import cdmuhlb.dgview.color.{ColorSpaceConversion, SRgbColor, CieXyzColor, MshColor, ColorUtils}
 
 trait ColorMap {
   def map(z: Double): Int
@@ -14,7 +14,7 @@ trait ColorMapFactory {
 
 object GammaGrayLinearFactory extends ColorMapFactory {
   def createMap(lo: Double, hi: Double) = GammaGrayLinearColorMap(lo, hi)
-  override def toString(): String = "Grayscale"
+  override def toString(): String = "sRGB gray"
 }
 
 case class GammaGrayLinearColorMap(lo: Double, hi: Double) extends ColorMap {
@@ -26,6 +26,23 @@ case class GammaGrayLinearColorMap(lo: Double, hi: Double) extends ColorMap {
   }
 
   def getFactory = GammaGrayLinearFactory
+}
+
+object LabGrayFactory extends ColorMapFactory {
+  def createMap(lo: Double, hi: Double) = LabGrayColorMap(lo, hi)
+  override def toString(): String = "Lab gray"
+}
+
+case class LabGrayColorMap(lo: Double, hi: Double) extends ColorMap {
+  require(hi > lo)
+
+  def map(z: Double): Int = {
+    val zNorm = ((z - lo)/(hi - lo)).max(0.0).min(1.0)
+    val v = ColorUtils.lightnessToSRgbValue(100.0*zNorm)
+    (0xff<<24) | (v<<16) | (v<<8) | v
+  }
+
+  def getFactory = LabGrayFactory
 }
 
 object BlackbodyFactory extends ColorMapFactory {
@@ -124,7 +141,7 @@ case class DivergingLinearColorMap(lo: Double, hi: Double) extends ColorMap {
 
 object MshRainbowColorMapFactory extends ColorMapFactory {
   def createMap(lo: Double, hi: Double) = MshRainbowColorMap(lo, hi)
-  override def toString(): String = "MshRainbow"
+  override def toString(): String = "Msh rainbow"
 }
 
 /**
