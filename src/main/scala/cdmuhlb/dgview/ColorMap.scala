@@ -131,20 +131,21 @@ object MshRainbowColorMapFactory extends ColorMapFactory {
   * Spiral in saturation and hue achieving perceptual uniformity.
   * The parameters chosen here ensure that all colors remain in the sRGB gamut.
   *
-  * For reference, the allowed ranges of the Msh coordinates are:
-  * M: [0, 100], s: [0, pi/2], h: [0, 2*pi].
-  * See http://www.sandia.gov/~kmorel/documents/ColorMaps/ColorMaps.pdf
+  * To design custom MshRainbow colormaps, see
+  * https://github.com/cdmuhlb/MshExplorer .
   */
 case class MshRainbowColorMap(lo: Double, hi: Double) extends ColorMap {
-  val m = 90.5
-  val (s0, h0) = (1.25, -1.03)
-  val n = 3.52
+  val (m, s0, sf, h0, hRate) = (90.5, 1.25, 0.0, -1.03, -3.52)
+  // These alternate parameters define a map that is more uniform in lightness
+  //val (m, s0, sf, h0, hRate) = (95.0, 1.2, 0.475, -1.1, -3.33)
 
   def map(z: Double): Int = {
     val zNorm01 = ((z - lo)/(hi - lo)).max(0.0).min(1.0)
-    val s = s0*(1.0 - zNorm01)
-    val h = if (s <= 0.0) 0.0 else if (s >= 0.5*math.Pi) h0 else
-        (h0 + n*math.log(math.tan(0.5*s0))) - n*math.log(math.tan(0.5*s))
+    val s = (sf - s0)*zNorm01 + s0
+    val h = if (s <= 0.0) 0.0 else if (s >= 0.5*math.Pi) h0 else {
+      (h0 + hRate*math.log(math.tan(0.5*s0))/(sf - s0)) -
+          hRate*math.log(math.tan(0.5*s))/(sf - s0)
+    }
     val msh = MshColor(m, s, h)
     val (cr, cg, cb) = ColorSpaceConversion.mshToSRgb(msh).toBytes
     (0xff<<24) | (cr<<16) | (cg<<8) | cb
