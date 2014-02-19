@@ -4,59 +4,37 @@ import scala.math.{acos, atan2, cbrt, cos, pow, sin, sqrt}
 import cdmuhlb.dgview.color.{ColorSpaceConversion, SRgbColor, CieXyzColor, MshColor, ColorUtils}
 
 trait ColorMap {
-  def map(z: Double): Int
-  def getFactory: ColorMapFactory
+  def mapToArgb(z: Double): Int
 }
 
-trait ColorMapFactory {
-  def createMap(lo: Double, hi: Double): ColorMap
+trait NormalizedColorMap {
+  def mapToArgb(zNorm: Double): Int
+  def name: String
+
+  override def toString(): String = name
 }
 
-object GammaGrayLinearFactory extends ColorMapFactory {
-  def createMap(lo: Double, hi: Double) = GammaGrayLinearColorMap(lo, hi)
-  override def toString(): String = "sRGB gray"
-}
-
-case class GammaGrayLinearColorMap(lo: Double, hi: Double) extends ColorMap {
-  require(hi > lo)
-
-  def map(z: Double): Int = {
-    val v = math.rint(((z - lo)/(hi - lo)).max(0.0).min(1.0)*255.0).toInt
+object SRgbGrayMap extends NormalizedColorMap {
+  def mapToArgb(zNorm: Double): Int = {
+    val v = math.rint(zNorm*255.0).toInt
     (0xff<<24) | (v<<16) | (v<<8) | v
   }
-
-  def getFactory = GammaGrayLinearFactory
+  val name = "sRgb gray"
 }
 
-object LabGrayFactory extends ColorMapFactory {
-  def createMap(lo: Double, hi: Double) = LabGrayColorMap(lo, hi)
-  override def toString(): String = "Lab gray"
-}
-
-case class LabGrayColorMap(lo: Double, hi: Double) extends ColorMap {
-  require(hi > lo)
-
-  def map(z: Double): Int = {
-    val zNorm = ((z - lo)/(hi - lo)).max(0.0).min(1.0)
+object LabGrayMap extends NormalizedColorMap {
+  def mapToArgb(zNorm: Double): Int = {
     val v = ColorUtils.lightnessToSRgbValue(100.0*zNorm)
     (0xff<<24) | (v<<16) | (v<<8) | v
   }
-
-  def getFactory = LabGrayFactory
+  val name = "Lab gray"
 }
 
-object BlackbodyFactory extends ColorMapFactory {
-  def createMap(lo: Double, hi: Double) = BlackbodyColorMap(lo, hi)
-  override def toString(): String = "Blackbody"
-}
-
-case class BlackbodyColorMap(lo: Double, hi: Double) extends ColorMap {
-  require(hi > lo)
-
-  def map(z: Double): Int = {
+object BlackbodyMap extends NormalizedColorMap {
+  def mapToArgb(zNorm: Double): Int = {
     val tMax = 6500.0
     val tMin = 1667.0
-    val t = ((z - lo)/(hi - lo)).max(0.0).min(1.0)*(tMax - tMin) + tMin
+    val t = zNorm*(tMax - tMin) + tMin
     val invT = 1.0 / t
     val invT2 = invT * invT
     val invT3 = invT2 * invT
@@ -82,66 +60,53 @@ case class BlackbodyColorMap(lo: Double, hi: Double) extends ColorMap {
         CieXyzColor(xyzX, xyzY, xyzZ)).toBytes
     (0xff<<24) | (cr<<16) | (cg<<8) | cb
   }
-
-  def getFactory = BlackbodyFactory
+  val name = "Blackbody"
 }
 
-case class ContourLinearFactory(nContours: Int, map: ColorMap)
-    extends ColorMapFactory {
-  def createMap(lo: Double, hi: Double) =
-      ContourLinearColorMap(lo, hi, nContours, map)
-  override def toString(): String = "sContour($map)"
-}
+case class DivergingMap(cL: MshColor, cML: MshColor, cMR: MshColor, cR: MshColor, id: String) extends NormalizedColorMap {
+  val mshFunc = ColorSpaceInterpolation.mshGradient4(cL, cML, cMR, cR)_
 
-case class ContourLinearColorMap(lo: Double, hi: Double, nContours: Int,
-    map: ColorMap) extends ColorMap {
-  require(hi > lo)
-  require(nContours > 1)
-  val stripeWidth = (hi - lo)/(nContours - 1)
-
-  def map(z: Double): Int = {
-    if (z <= lo) map.map(lo)
-    else if (z >= hi) map.map(hi)
-    else {
-      val stripeNum = math.rint((z - lo)/stripeWidth)
-      map.map(lo + stripeNum*stripeWidth)
-    }
-  }
-
-  lazy val getFactory = ContourLinearFactory(nContours, map)
-
-  def withColormap(newMap: ColorMap): ContourLinearColorMap =
-      ContourLinearColorMap(lo, hi, nContours, newMap)
-
-  def withFactory(factory: ColorMapFactory): ContourLinearColorMap =
-      withColormap(factory.createMap(lo, hi))
-
-  def withContours(newContours: Int) =
-      ContourLinearColorMap(lo, hi, newContours, map)
-}
-
-object DivergingLinearFactory extends ColorMapFactory {
-  def createMap(lo: Double, hi: Double) = DivergingLinearColorMap(lo, hi)
-  override def toString(): String = "Diverging"
-}
-
-case class DivergingLinearColorMap(lo: Double, hi: Double) extends ColorMap {
-  val mshFunc = ColorSpaceInterpolation.mshGradient4(
-      MshColor(80.0, 1.08, -1.1), MshColor(88.0, 0.0, -1.661),
-      MshColor(88.0, 0.0, 1.061), MshColor(80.0, 1.08, 0.5))_
-
-  def map(z: Double): Int = {
-    val zNorm = (2.0*(z - lo)/(hi - lo) - 1.0).max(-1.0).min(1.0)
-    val (cr, cg, cb) = ColorSpaceConversion.mshToSRgb(mshFunc(zNorm)).toBytes
+  def mapToArgb(zNorm: Double): Int = {
+    val zz = 2.0*zNorm - 1.0
+    val (cr, cg, cb) = ColorSpaceConversion.mshToSRgb(mshFunc(zz)).toBytes
     (0xff<<24) | (cr<<16) | (cg<<8) | cb
   }
-
-  def getFactory = DivergingLinearFactory
+  def name = "Diverging " + id
 }
 
-object MshRainbowColorMapFactory extends ColorMapFactory {
-  def createMap(lo: Double, hi: Double) = MshRainbowColorMap(lo, hi)
-  override def toString(): String = "Msh rainbow"
+object DivergingMap {
+  def fromEndpoints(cL: SRgbColor, cR: SRgbColor, id: String): DivergingMap = {
+    import ColorSpaceConversion.sRgbToMsh
+    fromEndpoints(sRgbToMsh(cL), sRgbToMsh(cR), id)
+  }
+
+  def fromEndpoints(cL: MshColor, cR: MshColor, id: String): DivergingMap = {
+    import ColorSpaceInterpolation.adjustHue
+    val mM = cL.m.max(cR.m.max(88.0))
+    val hML = adjustHue(cL, mM)
+    val hMR = adjustHue(cR, mM)
+    DivergingMap(cL, MshColor(mM, 0.0, hML), MshColor(mM, 0.0, hMR), cR, id)
+  }
+
+  // Cool to warm (Paraview default)
+  val preset1 = fromEndpoints(SRgbColor(0.230, 0.299, 0.754),
+      SRgbColor(0.706, 0.016, 0.150), "cool/warm")
+
+  // Purple to orange
+  val preset2 = fromEndpoints(SRgbColor(0.436, 0.308, 0.631),
+      SRgbColor(0.759, 0.334, 0.046), "purple/orange")
+
+  // Green to purple
+  val preset3 = fromEndpoints(SRgbColor(0.085, 0.532, 0.201),
+      SRgbColor(0.436, 0.308, 0.631), "green/purple")
+
+  // Blue to tan
+  val preset4 = fromEndpoints(SRgbColor(0.217, 0.525, 0.910),
+      SRgbColor(0.677, 0.492, 0.093), "blue/tan")
+
+  // Green to red
+  val preset5 = fromEndpoints(SRgbColor(0.085, 0.532, 0.201),
+      SRgbColor(0.758, 0.214, 0.233), "green/red")
 }
 
 /**
@@ -151,14 +116,10 @@ object MshRainbowColorMapFactory extends ColorMapFactory {
   * To design custom MshRainbow colormaps, see
   * https://github.com/cdmuhlb/MshExplorer .
   */
-case class MshRainbowColorMap(lo: Double, hi: Double) extends ColorMap {
-  val (m, s0, sf, h0, hRate) = (90.5, 1.25, 0.0, -1.03, -3.52)
-  // These alternate parameters define a map that is more uniform in lightness
-  //val (m, s0, sf, h0, hRate) = (95.0, 1.2, 0.475, -1.1, -3.33)
-
-  def map(z: Double): Int = {
-    val zNorm01 = ((z - lo)/(hi - lo)).max(0.0).min(1.0)
-    val s = (sf - s0)*zNorm01 + s0
+case class MshRainbowMap(m: Double, s0: Double, sf: Double,
+    h0: Double, hRate: Double, id: String) extends NormalizedColorMap {
+  def mapToArgb(zNorm: Double): Int = {
+    val s = (sf - s0)*zNorm + s0
     val h = if (s <= 0.0) 0.0 else if (s >= 0.5*math.Pi) h0 else {
       (h0 + hRate*math.log(math.tan(0.5*s0))/(sf - s0)) -
           hRate*math.log(math.tan(0.5*s))/(sf - s0)
@@ -167,7 +128,42 @@ case class MshRainbowColorMap(lo: Double, hi: Double) extends ColorMap {
     val (cr, cg, cb) = ColorSpaceConversion.mshToSRgb(msh).toBytes
     (0xff<<24) | (cr<<16) | (cg<<8) | cb
   }
-  def getFactory = MshRainbowColorMapFactory
+  def name = "Msh rainbow " + id
+}
+
+object MshRainbowMap {
+  // Spiral from deep purple through red to light green
+  val preset1 = MshRainbowMap(90.5, 1.25, 0.0, -1.03, -3.52, "1")
+
+  // More uniform in lightness, so may be better for shading
+  val preset1b = MshRainbowMap(95.0, 1.2, 0.475, -1.1, -3.33, "1b")
+
+  // Spiral from deep red through blue to medium green
+  val preset2 = MshRainbowMap(84.25, 1.1, 0.215, 0.725, 3.0, "2")
+}
+
+case class ContourLinearColorMap(lo: Double, hi: Double, nContours: Int,
+    map: NormalizedColorMap) extends ColorMap {
+  require(hi > lo)
+  require(nContours > 1)
+  val stripeWidth = (hi - lo)/(nContours - 1)
+
+  def mapToArgb(z: Double): Int = {
+    if (z <= lo) map.mapToArgb(0.0)
+    else if (z >= hi) map.mapToArgb(1.0)
+    else {
+      val stripeNum = math.rint((z - lo)/stripeWidth)
+      val zz = lo + stripeNum*stripeWidth
+      val zNorm = ((zz - lo)/(hi - lo)).min(1.0).max(0.0)
+      map.mapToArgb(zNorm)
+    }
+  }
+
+  def withColormap(newMap: NormalizedColorMap): ContourLinearColorMap =
+      ContourLinearColorMap(lo, hi, nContours, newMap)
+
+  def withContours(newContours: Int) =
+      ContourLinearColorMap(lo, hi, newContours, map)
 }
 
 
@@ -185,5 +181,14 @@ object ColorSpaceInterpolation {
     val (a, b, c1, c2) = if (x < 0) (-x,      1.0 + x, cL,  cML)
                          else       (1.0 - x, x,       cMR, cR )
     MshColor(a*c1.m + b*c2.m, a*c1.s + b*c2.s, a*c1.h + b*c2.h)
+  }
+
+  def adjustHue(c: MshColor, m: Double): Double = {
+    if (c.m >= m) c.h
+    else {
+      val hSpin = c.s*math.sqrt(m*m - c.m*c.m) / (c.m*math.sin(c.s))
+      if (c.h > -math.Pi/3.0) c.h + hSpin
+      else c.h - hSpin
+    }
   }
 }

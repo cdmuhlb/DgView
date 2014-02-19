@@ -104,7 +104,7 @@ class RenderActor extends Actor {
       for (iy ← 0 until height;
            ix ← 0 until width) {
         val z = zs(iy)(ix)
-        img.setRGB(ix, iy, spec.colorMap.map(z))
+        img.setRGB(ix, iy, spec.colorMap.mapToArgb(z))
       }
       Some(img)
     } else None

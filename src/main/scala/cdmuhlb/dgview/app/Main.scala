@@ -9,9 +9,9 @@ import scala.swing.{Action, BoxPanel, Button, ComboBox, FlowPanel, Label, Slider
 import scala.swing.FileChooser
 import scala.swing.event.{SelectionChanged, ValueChanged}
 import com.typesafe.config.ConfigFactory
-import cdmuhlb.dgview.{ContourLinearColorMap, DivergingLinearColorMap, Domain, DomainElement, DomainSeq, DomainPlot}
+import cdmuhlb.dgview.{ContourLinearColorMap, Domain, DomainElement, DomainSeq, DomainPlot}
 import cdmuhlb.dgview.{PixelMap, PixelBounds, DomainBounds, RenderSpec}
-import cdmuhlb.dgview.{ColorMapFactory, DivergingLinearFactory, MshRainbowColorMapFactory, LabGrayFactory}
+import cdmuhlb.dgview.{SRgbGrayMap, LabGrayMap, BlackbodyMap, DivergingMap, MshRainbowMap}
 import cdmuhlb.dgview.actor.AnimationWorker
 import cdmuhlb.dgview.io.{FhebertDataDir, FhebertDataFile, Html5Video}
 
@@ -50,13 +50,17 @@ object Main extends SimpleSwingApplication {
     }
 
     val labColor = new Label("Colormap:")
-    val colorCombo = new ComboBox(List[ColorMapFactory](
-        DivergingLinearFactory, LabGrayFactory, MshRainbowColorMapFactory)) {
-      selection.item = plot.getColorMap.map.getFactory
+    val colorCombo = new ComboBox(List(
+        LabGrayMap,
+        DivergingMap.preset1, DivergingMap.preset2, DivergingMap.preset3,
+        DivergingMap.preset4, DivergingMap.preset5,
+        MshRainbowMap.preset1, MshRainbowMap.preset2
+      )) {
+      selection.item = plot.getColorMap.map
       reactions += {
         case SelectionChanged(box) ⇒
           assert(box == this)
-          plot.setColorMap(plot.getColorMap.withFactory(selection.item))
+          plot.setColorMap(plot.getColorMap.withColormap(selection.item))
       }
       listenTo(selection)
     }
@@ -84,9 +88,8 @@ object Main extends SimpleSwingApplication {
         val hi = txt2.text.toDouble
         val nContours = txt3.text.toInt
         if ((hi > lo) && (nContours > 1)) {
-          val colorFactory = plot.getColorMap.map.getFactory
-          plot.setColorMap(plot.getColorMap.getFactory.createMap(
-              lo, hi).withContours(nContours).withFactory(colorFactory))
+          plot.setColorMap(ContourLinearColorMap(lo, hi, nContours,
+              plot.getColorMap.map))
         } else {
           Console.err.println("Invalid colormap parameters")
         }
