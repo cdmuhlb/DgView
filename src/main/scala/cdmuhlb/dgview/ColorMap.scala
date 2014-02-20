@@ -245,21 +245,21 @@ case class ContourLinearColorMap(lo: Double, hi: Double, nContours: Int,
 
   // Note: Resulting palette "gray" range is [0, 1], not [lo, hi]
   def mkGnuplotPalette: String = {
-    def mkEntry(z: Double, c: Int) = f"$z%.6f '#$c%06x'"
+    def mkEntry(z: Double, c: SRgbColor) = f"$z%.6f '${c.toHexString}'"
 
     val interiorEntries = for (i ← 1 until (nContours - 1)) yield {
       val zLo = (i - 0.5)/(nContours - 1)
       val z = i.toDouble/(nContours - 1)
       val zHi = (i + 0.5)/(nContours - 1)
-      val c = mapToArgb(z) & 0xffffff
+      val c = map.mapToSRgb(z)
       mkEntry(zLo, c) + ", " + mkEntry(zHi, c)
     }
     val firstEntry = {
-      val c = mapToArgb(0.0) & 0xffffff
+      val c = map.mapToSRgb(0.0)
       mkEntry(0.0, c) + ", " + mkEntry(0.5/(nContours - 1), c)
     }
     val lastEntry = {
-      val c = mapToArgb(1.0) & 0xffffff
+      val c = map.mapToSRgb(1.0)
       mkEntry(1.0 - 0.5/(nContours - 1), c) + ", " + mkEntry(1.0, c)
     }
     interiorEntries.mkString(s"set palette defined($firstEntry, ", ", ",
