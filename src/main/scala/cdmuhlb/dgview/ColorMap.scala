@@ -1,6 +1,6 @@
 package cdmuhlb.dgview
 
-import cdmuhlb.dgview.color.{ColorSpaceConversion, SRgbColor, CieXyzColor, MshColor}
+import cdmuhlb.dgview.color.{ColorSpaceConversion, SRgbColor, MshColor}
 import cdmuhlb.dgview.color.{ColorUtils, SRgbUtils}
 
 trait ColorMap {
@@ -42,6 +42,8 @@ object LabGrayMap extends NormalizedColorMap {
 
 // This map is not currently functioning as desired
 object BlackbodyMap extends NormalizedColorMap {
+  import cdmuhlb.dgview.color.CieXyzColor
+
   def mapToArgb(zNorm: Double): Int = {
     val tMax = 6500.0
     val tMin = 1667.0
@@ -91,11 +93,19 @@ object DivergingMap {
   }
 
   def fromEndpoints(cL: MshColor, cR: MshColor, id: String): DivergingMap = {
-    import ColorSpaceInterpolation.adjustHue
     val mM = cL.m.max(cR.m.max(88.0))
     val hML = adjustHue(cL, mM)
     val hMR = adjustHue(cR, mM)
     DivergingMap(cL, MshColor(mM, 0.0, hML), MshColor(mM, 0.0, hMR), cR, id)
+  }
+
+  def adjustHue(c: MshColor, m: Double): Double = {
+    import math.{Pi, sin, sqrt}
+    if (c.m >= m) c.h
+    else {
+      val hSpin = c.s*sqrt(m*m - c.m*c.m) / (c.m*sin(c.s))
+      if (c.h > -Pi/3.0) c.h + hSpin else c.h - hSpin
+    }
   }
 
   // Cool to warm (Paraview default)
@@ -153,6 +163,28 @@ object MshRainbowMap {
   val preset2 = MshRainbowMap(84.25, 1.1, 0.215, 0.725, 3.0, "2")
 }
 
+case class ReverseMap(map: NormalizedColorMap, name: String) extends
+    NormalizedColorMap {
+  def mapToArgb(zNorm: Double): Int = map.mapToArgb(1.0 - zNorm)
+}
+
+object ReverseMap {
+  def apply(map: NormalizedColorMap): ReverseMap =
+      ReverseMap(map, "Reverse " + map.name)
+}
+
+case class SubMap(map: NormalizedColorMap, zLo: Double, zHi: Double,
+    name: String) extends NormalizedColorMap {
+  require((zLo >= 0.0) && (zLo <= 1.0) && (zHi >= 0.0) && (zHi <= 1.0))
+  def mapToArgb(zNorm: Double): Int = map.mapToArgb(zLo + zNorm*(zHi - zLo))
+}
+
+object SubMap {
+  def apply(map: NormalizedColorMap, zLo: Double, zHi: Double): SubMap =
+      SubMap(map, zLo, zHi, map.name + f" subset ($zLo%.2f–$zHi%.2f)")
+}
+
+
 case class ContourLinearColorMap(lo: Double, hi: Double, nContours: Int,
     map: NormalizedColorMap) extends ColorMap {
   require(hi > lo)
@@ -197,32 +229,5 @@ case class ContourLinearColorMap(lo: Double, hi: Double, nContours: Int,
     }
     interiorEntries.mkString(s"set palette defined($firstEntry, ", ", ",
         s", $lastEntry)")
-  }
-}
-
-
-object ColorSpaceInterpolation {
-  def mshGradient(c1: MshColor, c2: MshColor, x: Double): MshColor = {
-    //assert(c1.m == c2.m)
-    val m = 0.5*(c1.m + c2.m)
-    val s = if (x < 0) -x*c1.s else x*c2.s
-    val h = if (x < 0) c1.h else c2.h
-    MshColor(m, s, h)
-  }
-
-  def mshGradient4(cL: MshColor, cML: MshColor, cMR: MshColor, cR: MshColor)
-                  (x: Double): MshColor = {
-    val (a, b, c1, c2) = if (x < 0) (-x,      1.0 + x, cL,  cML)
-                         else       (1.0 - x, x,       cMR, cR )
-    MshColor(a*c1.m + b*c2.m, a*c1.s + b*c2.s, a*c1.h + b*c2.h)
-  }
-
-  def adjustHue(c: MshColor, m: Double): Double = {
-    import math.{Pi, sin, sqrt}
-    if (c.m >= m) c.h
-    else {
-      val hSpin = c.s*sqrt(m*m - c.m*c.m) / (c.m*sin(c.s))
-      if (c.h > -Pi/3.0) c.h + hSpin else c.h - hSpin
-    }
   }
 }
