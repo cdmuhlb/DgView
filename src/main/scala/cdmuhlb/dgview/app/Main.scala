@@ -11,7 +11,7 @@ import scala.swing.event.{SelectionChanged, ValueChanged}
 import com.typesafe.config.ConfigFactory
 import cdmuhlb.dgview.{ContourLinearColorMap, Domain, DomainElement, DomainSeq, DomainPlot}
 import cdmuhlb.dgview.{PixelMap, PixelBounds, DomainBounds, RenderSpec}
-import cdmuhlb.dgview.{SRgbGrayMap, LabGrayMap, BlackbodyMap, DivergingMap, MshRainbowMap}
+import cdmuhlb.dgview.{SRgbGrayMap, LabGrayMap, BlackbodyMap, DivergingMap, MshRainbowMap, ReverseMap}
 import cdmuhlb.dgview.actor.AnimationWorker
 import cdmuhlb.dgview.io.{FhebertDataDir, FhebertDataFile, Html5Video}
 
@@ -51,7 +51,7 @@ object Main extends SimpleSwingApplication {
 
     val labColor = new Label("Colormap:")
     val colorCombo = new ComboBox(List(
-        LabGrayMap,
+        LabGrayMap, ReverseMap(LabGrayMap, "Lab gray inverse"),
         DivergingMap.preset1, DivergingMap.preset2, DivergingMap.preset3,
         DivergingMap.preset4, DivergingMap.preset5,
         MshRainbowMap.preset1, MshRainbowMap.preset2
