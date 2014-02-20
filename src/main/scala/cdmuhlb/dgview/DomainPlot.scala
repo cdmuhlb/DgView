@@ -47,7 +47,7 @@ class DomainPlot(doms: DomainSeq, pbar: ProgressBar) extends Component
     }
   }
 
-  private var colorMap = ContourLinearColorMap(0.0, 5.0, 10,
+  private var colorMap = ContourLinearColorMap(0.0, 5.0, 17,
       DivergingMap.preset1)
   def getColorMap: ContourLinearColorMap = colorMap
   def setColorMap(cmap: ContourLinearColorMap) {
