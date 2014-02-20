@@ -5,6 +5,11 @@ import scala.math.{acos, atan2, cbrt, cos, pow, sin, sqrt}
 case class SRgbColor(r: Double, g: Double, b: Double) {
   def toBytes = ((255.0*r + 0.5).toInt, (255.0*g + 0.5).toInt,
                  (255.0*b + 0.5).toInt)
+
+  def toArgb: Int = {
+    import SRgbUtils.encode
+    (0xff<<24) | (encode(r)<<16) | (encode(g)<<8) | encode(b)
+  }
 }
 
 object SRgbColor {

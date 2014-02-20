@@ -1,7 +1,7 @@
 package cdmuhlb.dgview
 
-import scala.math.{acos, atan2, cbrt, cos, pow, sin, sqrt}
-import cdmuhlb.dgview.color.{ColorSpaceConversion, SRgbColor, CieXyzColor, MshColor, ColorUtils}
+import cdmuhlb.dgview.color.{ColorSpaceConversion, SRgbColor, CieXyzColor, MshColor}
+import cdmuhlb.dgview.color.{ColorUtils, SRgbUtils}
 
 trait ColorMap {
   def mapToArgb(z: Double): Int
@@ -11,12 +11,22 @@ trait NormalizedColorMap {
   def mapToArgb(zNorm: Double): Int
   def name: String
 
+  // For use by GUI controls
   override def toString(): String = name
+
+  def mkGnuplotPalette(nEntries: Int): String = {
+    val entries = for (i ← 0 until nEntries) yield {
+      val z = i.toDouble/(nEntries - 1)
+      val c = mapToArgb(z) & 0xffffff
+      f"$z%.6f '#$c%06x'"
+    }
+    entries.mkString("set palette defined(", ", ", ")")
+  }
 }
 
 object SRgbGrayMap extends NormalizedColorMap {
   def mapToArgb(zNorm: Double): Int = {
-    val v = math.rint(zNorm*255.0).toInt
+    val v = SRgbUtils.encode(zNorm)
     (0xff<<24) | (v<<16) | (v<<8) | v
   }
   val name = "sRgb gray"
@@ -30,6 +40,7 @@ object LabGrayMap extends NormalizedColorMap {
   val name = "Lab gray"
 }
 
+// This map is not currently functioning as desired
 object BlackbodyMap extends NormalizedColorMap {
   def mapToArgb(zNorm: Double): Int = {
     val tMax = 6500.0
@@ -56,20 +67,19 @@ object BlackbodyMap extends NormalizedColorMap {
     val xyzY = math.pow(t/tMax, 4).max(0.0).min(1.0)
     val xyzX = (xyzY * x / y).max(0.0).min(1.0)
     val xyzZ = (xyzY * (1.0 - x - y) / y).max(0.0).min(1.0)
-    val (cr, cg, cb) = ColorSpaceConversion.cieXyzToSRgb(
-        CieXyzColor(xyzX, xyzY, xyzZ)).toBytes
-    (0xff<<24) | (cr<<16) | (cg<<8) | cb
+    ColorSpaceConversion.cieXyzToSRgb(CieXyzColor(xyzX, xyzY, xyzZ)).toArgb
   }
   val name = "Blackbody"
 }
 
-case class DivergingMap(cL: MshColor, cML: MshColor, cMR: MshColor, cR: MshColor, id: String) extends NormalizedColorMap {
-  val mshFunc = ColorSpaceInterpolation.mshGradient4(cL, cML, cMR, cR)_
-
+case class DivergingMap(cL: MshColor, cML: MshColor, cMR: MshColor,
+    cR: MshColor, id: String) extends NormalizedColorMap {
   def mapToArgb(zNorm: Double): Int = {
     val zz = 2.0*zNorm - 1.0
-    val (cr, cg, cb) = ColorSpaceConversion.mshToSRgb(mshFunc(zz)).toBytes
-    (0xff<<24) | (cr<<16) | (cg<<8) | cb
+    val (a, b, c1, c2) = if (zz < 0) (-zz,      1.0 + zz, cL,  cML)
+                         else        (1.0 - zz, zz,       cMR, cR )
+    val msh = MshColor(a*c1.m + b*c2.m, a*c1.s + b*c2.s, a*c1.h + b*c2.h)
+    ColorSpaceConversion.mshToSRgb(msh).toArgb
   }
   def name = "Diverging " + id
 }
@@ -111,27 +121,28 @@ object DivergingMap {
 
 /**
   * Spiral in saturation and hue achieving perceptual uniformity.
-  * The parameters chosen here ensure that all colors remain in the sRGB gamut.
   *
   * To design custom MshRainbow colormaps, see
   * https://github.com/cdmuhlb/MshExplorer .
   */
 case class MshRainbowMap(m: Double, s0: Double, sf: Double,
     h0: Double, hRate: Double, id: String) extends NormalizedColorMap {
+  import math.{Pi, log, tan}
+  private val hOffset = h0 + hRate*log(tan(0.5*s0))/(sf - s0)
+
   def mapToArgb(zNorm: Double): Int = {
     val s = (sf - s0)*zNorm + s0
-    val h = if (s <= 0.0) 0.0 else if (s >= 0.5*math.Pi) h0 else {
-      (h0 + hRate*math.log(math.tan(0.5*s0))/(sf - s0)) -
-          hRate*math.log(math.tan(0.5*s))/(sf - s0)
-    }
-    val msh = MshColor(m, s, h)
-    val (cr, cg, cb) = ColorSpaceConversion.mshToSRgb(msh).toBytes
-    (0xff<<24) | (cr<<16) | (cg<<8) | cb
+    val h = if (s <= 0.0) 0.0 else if (s >= 0.5*Pi) h0 else
+        hOffset - hRate*log(tan(0.5*s))/(sf - s0)
+    ColorSpaceConversion.mshToSRgb(MshColor(m, s, h)).toArgb
   }
   def name = "Msh rainbow " + id
 }
 
 object MshRainbowMap {
+  // The parameters chosen for these presets ensure that all colors remain in
+  //   the sRGB gamut
+
   // Spiral from deep purple through red to light green
   val preset1 = MshRainbowMap(90.5, 1.25, 0.0, -1.03, -3.52, "1")
 
@@ -164,6 +175,29 @@ case class ContourLinearColorMap(lo: Double, hi: Double, nContours: Int,
 
   def withContours(newContours: Int) =
       ContourLinearColorMap(lo, hi, newContours, map)
+
+  // Note: Resulting palette "gray" range is [0, 1], not [lo, hi]
+  def mkGnuplotPalette: String = {
+    def mkEntry(z: Double, c: Int) = f"$z%.6f '#$c%06x'"
+
+    val interiorEntries = for (i ← 1 until (nContours - 1)) yield {
+      val zLo = (i - 0.5)/(nContours - 1)
+      val z = i.toDouble/(nContours - 1)
+      val zHi = (i + 0.5)/(nContours - 1)
+      val c = mapToArgb(z) & 0xffffff
+      mkEntry(zLo, c) + ", " + mkEntry(zHi, c)
+    }
+    val firstEntry = {
+      val c = mapToArgb(0.0) & 0xffffff
+      mkEntry(0.0, c) + ", " + mkEntry(0.5/(nContours - 1), c)
+    }
+    val lastEntry = {
+      val c = mapToArgb(1.0) & 0xffffff
+      mkEntry(1.0 - 0.5/(nContours - 1), c) + ", " + mkEntry(1.0, c)
+    }
+    interiorEntries.mkString(s"set palette defined($firstEntry, ", ", ",
+        s", $lastEntry)")
+  }
 }
 
 
@@ -184,11 +218,11 @@ object ColorSpaceInterpolation {
   }
 
   def adjustHue(c: MshColor, m: Double): Double = {
+    import math.{Pi, sin, sqrt}
     if (c.m >= m) c.h
     else {
-      val hSpin = c.s*math.sqrt(m*m - c.m*c.m) / (c.m*math.sin(c.s))
-      if (c.h > -math.Pi/3.0) c.h + hSpin
-      else c.h - hSpin
+      val hSpin = c.s*sqrt(m*m - c.m*c.m) / (c.m*sin(c.s))
+      if (c.h > -Pi/3.0) c.h + hSpin else c.h - hSpin
     }
   }
 }
