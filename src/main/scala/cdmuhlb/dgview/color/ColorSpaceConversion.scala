@@ -3,18 +3,30 @@ package cdmuhlb.dgview.color
 import scala.math.{acos, atan2, cbrt, cos, pow, sin, sqrt}
 
 case class SRgbColor(r: Double, g: Double, b: Double) {
-  def toBytes = ((255.0*r + 0.5).toInt, (255.0*g + 0.5).toInt,
-                 (255.0*b + 0.5).toInt)
+  import SRgbUtils.encode
+
+  def toBytes = (encode(r), encode(g), encode(b))
 
   def toArgb: Int = {
-    import SRgbUtils.encode
     (0xff<<24) | (encode(r)<<16) | (encode(g)<<8) | encode(b)
   }
+
+  def toHexString: String = f"#${toArgb & 0xffffff}%06x"
 }
 
 object SRgbColor {
+  import SRgbUtils.decode
+
   def fromBytes(r: Int, g: Int, b: Int): SRgbColor =
-      SRgbColor(r/255.0, g/255.0, b/255.0)
+      SRgbColor(decode(r), decode(g), decode(b))
+
+  def fromArgb(argb: Int): SRgbColor = {
+    SRgbColor(decode((argb>>>16) & 0xff), decode((argb>>>16) & 0xff),
+        decode((argb>>>16) & 0xff))
+  }
+
+  // TODO
+  def fromHexString(hex: String) = ???
 }
 
 case class CieXyzColor(x: Double, y: Double, z: Double)

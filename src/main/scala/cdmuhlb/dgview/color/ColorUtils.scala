@@ -35,6 +35,11 @@ object SRgbUtils {
     require((b >= 0) && (b <= 255))
     b / 255.0
   }
+
+  def decodeFloat(b: Int): Float = {
+    require((b >= 0) && (b <= 255))
+    b / 255.0f
+  }
 }
 
 object Bt709Utils {
@@ -88,12 +93,12 @@ object LabUtils {
 object ColorUtils {
   /**
     * Lightness is defined to range from 0 to 100.
-    * Output ranges from 0 to 255.
+    * Output ranges from 0 to 1.
     */
-  def lightnessToSRgbValue(labL: Double): Int = {
+  def lightnessToSRgbValue(labL: Double): Double = {
     require((labL >= 0.0) && (labL <= 100.0))
     val t = (labL + 16.0)/116.0
     val y = LabUtils.Yn*LabUtils.pauliFInverse(t)
-    SRgbUtils.encode(SRgbUtils.forwardTransfer(y))
+    SRgbUtils.forwardTransfer(y)
   }
 }

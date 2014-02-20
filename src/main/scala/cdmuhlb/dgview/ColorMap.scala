@@ -8,7 +8,8 @@ trait ColorMap {
 }
 
 trait NormalizedColorMap {
-  def mapToArgb(zNorm: Double): Int
+  def mapToSRgb(zNorm: Double): SRgbColor
+  def mapToArgb(zNorm: Double): Int = mapToSRgb(zNorm).toArgb
   def name: String
 
   // For use by GUI controls
@@ -17,26 +18,50 @@ trait NormalizedColorMap {
   def mkGnuplotPalette(nEntries: Int): String = {
     val entries = for (i ← 0 until nEntries) yield {
       val z = i.toDouble/(nEntries - 1)
-      val c = mapToArgb(z) & 0xffffff
-      f"$z%.6f '#$c%06x'"
+      val c = mapToSRgb(z)
+      f"$z%.6f '${c.toHexString}'"
     }
     entries.mkString("set palette defined(", ", ", ")")
+  }
+
+  def mkParaviewColorMap(nPoints: Int): String = {
+    val points = for (i ← 0 until nPoints) yield {
+      val z = i.toDouble/(nPoints - 1)
+      val c = mapToSRgb(z)
+      f"""  <Point x="$z%.6f" o="1.0" r="${c.r}%.6f" g="${c.g}%.6f" b="${c.b}%.6f" />"""
+    }
+    // Can't use "Diverging" or "HSV" space due to Paraview bug when
+    //   interpolating in polar coordinates
+    points.mkString(
+        s"""<ColorMap name="$name" space="RGB" indexedLookup="false">""" + "\n",
+        "\n", "\n</ColorMap>")
   }
 }
 
 object SRgbGrayMap extends NormalizedColorMap {
-  def mapToArgb(zNorm: Double): Int = {
+  def mapToSRgb(zNorm: Double): SRgbColor = SRgbColor(zNorm, zNorm, zNorm)
+
+  override def mapToArgb(zNorm: Double): Int = {
     val v = SRgbUtils.encode(zNorm)
     (0xff<<24) | (v<<16) | (v<<8) | v
   }
+
   val name = "sRgb gray"
 }
 
 object LabGrayMap extends NormalizedColorMap {
-  def mapToArgb(zNorm: Double): Int = {
-    val v = ColorUtils.lightnessToSRgbValue(100.0*zNorm)
+  import ColorUtils.lightnessToSRgbValue
+
+  def mapToSRgb(zNorm: Double): SRgbColor = {
+    val v = lightnessToSRgbValue(100.0*zNorm)
+    SRgbColor(v, v, v)
+  }
+
+  override def mapToArgb(zNorm: Double): Int = {
+    val v = SRgbUtils.encode(lightnessToSRgbValue(100.0*zNorm))
     (0xff<<24) | (v<<16) | (v<<8) | v
   }
+
   val name = "Lab gray"
 }
 
@@ -44,7 +69,7 @@ object LabGrayMap extends NormalizedColorMap {
 object BlackbodyMap extends NormalizedColorMap {
   import cdmuhlb.dgview.color.CieXyzColor
 
-  def mapToArgb(zNorm: Double): Int = {
+  def mapToSRgb(zNorm: Double): SRgbColor = {
     val tMax = 6500.0
     val tMin = 1667.0
     val t = zNorm*(tMax - tMin) + tMin
@@ -69,20 +94,21 @@ object BlackbodyMap extends NormalizedColorMap {
     val xyzY = math.pow(t/tMax, 4).max(0.0).min(1.0)
     val xyzX = (xyzY * x / y).max(0.0).min(1.0)
     val xyzZ = (xyzY * (1.0 - x - y) / y).max(0.0).min(1.0)
-    ColorSpaceConversion.cieXyzToSRgb(CieXyzColor(xyzX, xyzY, xyzZ)).toArgb
+    ColorSpaceConversion.cieXyzToSRgb(CieXyzColor(xyzX, xyzY, xyzZ))
   }
   val name = "Blackbody"
 }
 
 case class DivergingMap(cL: MshColor, cML: MshColor, cMR: MshColor,
     cR: MshColor, id: String) extends NormalizedColorMap {
-  def mapToArgb(zNorm: Double): Int = {
+  def mapToSRgb(zNorm: Double): SRgbColor = {
     val zz = 2.0*zNorm - 1.0
     val (a, b, c1, c2) = if (zz < 0) (-zz,      1.0 + zz, cL,  cML)
                          else        (1.0 - zz, zz,       cMR, cR )
     val msh = MshColor(a*c1.m + b*c2.m, a*c1.s + b*c2.s, a*c1.h + b*c2.h)
-    ColorSpaceConversion.mshToSRgb(msh).toArgb
+    ColorSpaceConversion.mshToSRgb(msh)
   }
+
   def name = "Diverging " + id
 }
 
@@ -140,12 +166,13 @@ case class MshRainbowMap(m: Double, s0: Double, sf: Double,
   import math.{Pi, log, tan}
   private val hOffset = h0 + hRate*log(tan(0.5*s0))/(sf - s0)
 
-  def mapToArgb(zNorm: Double): Int = {
+  def mapToSRgb(zNorm: Double): SRgbColor = {
     val s = (sf - s0)*zNorm + s0
     val h = if (s <= 0.0) 0.0 else if (s >= 0.5*Pi) h0 else
         hOffset - hRate*log(tan(0.5*s))/(sf - s0)
-    ColorSpaceConversion.mshToSRgb(MshColor(m, s, h)).toArgb
+    ColorSpaceConversion.mshToSRgb(MshColor(m, s, h))
   }
+
   def name = "Msh rainbow " + id
 }
 
@@ -163,9 +190,12 @@ object MshRainbowMap {
   val preset2 = MshRainbowMap(84.25, 1.1, 0.215, 0.725, 3.0, "2")
 }
 
+// TODO: Consider an abstract "MappedMap" base class
 case class ReverseMap(map: NormalizedColorMap, name: String) extends
     NormalizedColorMap {
-  def mapToArgb(zNorm: Double): Int = map.mapToArgb(1.0 - zNorm)
+  def mapToSRgb(zNorm: Double): SRgbColor = map.mapToSRgb(1.0 - zNorm)
+
+  override def mapToArgb(zNorm: Double): Int = map.mapToArgb(1.0 - zNorm)
 }
 
 object ReverseMap {
@@ -176,7 +206,12 @@ object ReverseMap {
 case class SubMap(map: NormalizedColorMap, zLo: Double, zHi: Double,
     name: String) extends NormalizedColorMap {
   require((zLo >= 0.0) && (zLo <= 1.0) && (zHi >= 0.0) && (zHi <= 1.0))
-  def mapToArgb(zNorm: Double): Int = map.mapToArgb(zLo + zNorm*(zHi - zLo))
+
+  def mapToSRgb(zNorm: Double): SRgbColor =
+      map.mapToSRgb(zLo + zNorm*(zHi - zLo))
+
+  override def mapToArgb(zNorm: Double): Int =
+      map.mapToArgb(zLo + zNorm*(zHi - zLo))
 }
 
 object SubMap {
