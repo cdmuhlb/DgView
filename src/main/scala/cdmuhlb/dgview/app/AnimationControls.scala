@@ -6,6 +6,7 @@ import java.beans.{PropertyChangeEvent, PropertyChangeListener}
 import java.io.File
 import javax.imageio.ImageIO
 import javax.swing.{BorderFactory, SwingWorker}
+import scala.collection.mutable.ListBuffer
 import scala.swing.{Dialog, Swing}
 import scala.swing.{BoxPanel, Orientation}
 import scala.swing.{Action, Button, ButtonGroup, RadioButton}
@@ -220,16 +221,29 @@ class PngSequence(dir: File, prefix: String) extends FrameReceiver {
 
 class AnimatedGif(fps: Int, dir: File, prefix: String) extends FrameReceiver {
   assert(dir.isDirectory)
+  val filesBuffer = new ListBuffer[File]
 
   def receiveFrame(img: BufferedImage, step: Int): Unit = {
-    val outFile = new File(dir, f"frame_$step%04d.png")
+    val outFile = File.createTempFile("dgview_frame_", ".png")
+    filesBuffer += outFile
     ImageIO.write(img, "png", outFile)
   }
 
   def noMoreFrames(): Unit = {
+    import scala.sys.process._
     val delay = math.round(100.0f/fps)
-    println("To animate, run:")
-    println(s"$$ convert -delay 20 -loop 0 '$dir${File.separator}frame_'*.png $prefix.gif")
+    val files = filesBuffer.result
+    val cmd = List("convert", "-delay", delay.toString, "-loop", "0") :::
+        (files.map(_.getCanonicalPath) :+ s"$prefix.gif")
+    try {
+      val ret = cmd.!
+      if (ret != 0) Dialog.showMessage(null, "Error creating animated GIF",
+          s"The `convert` command exited with status $ret", Dialog.Message.Warning)
+    } catch {
+      case e: Exception ⇒ Dialog.showMessage(null, "Error creating animated GIF",
+          s"The `convert` command could not be executed", Dialog.Message.Warning)
+    }
+    for (file ← files) file.delete()
   }
 }
 
