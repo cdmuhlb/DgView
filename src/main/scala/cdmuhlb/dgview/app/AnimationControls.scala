@@ -3,7 +3,7 @@ package cdmuhlb.dgview.app
 import java.awt.Dimension
 import java.awt.image.BufferedImage
 import java.beans.{PropertyChangeEvent, PropertyChangeListener}
-import java.io.File
+import java.io.{File, FileOutputStream}
 import javax.imageio.ImageIO
 import javax.swing.{BorderFactory, SwingWorker}
 import scala.collection.mutable.ListBuffer
@@ -15,6 +15,7 @@ import scala.swing.FileChooser
 import cdmuhlb.dgview.{DomainBounds, DomainPlot, PixelBounds, PixelMap, RenderSpec}
 import cdmuhlb.dgview.actor.{AnimationWorker, FrameReceiver}
 import cdmuhlb.dgview.io.Html5Video
+import cdmuhlb.dgview.media.FrameEncoder
 
 class AnimationControls(plot: DomainPlot) {
   val progressBar = new ProgressBar
@@ -37,7 +38,6 @@ class AnimationControls(plot: DomainPlot) {
         val mp4Radio = new RadioButton("MP4 video (AVC)")
         framesRadio.selected = true
         gifRadio.enabled = AnimationControls.hasImageMagickConvert
-        i420Radio.enabled = false
         mp4Radio.enabled = AnimationControls.hasX264
         val radioGroup = new ButtonGroup(framesRadio, gifRadio, i420Radio, mp4Radio)
 
@@ -112,17 +112,18 @@ class AnimationControls(plot: DomainPlot) {
                 Dialog.showMessage(null, "Invalid animation parameters",
                   "Error: Invalid animation parameters", Dialog.Message.Error)
               } else {
-                radioGroup.selected match {
-                  case Some(`framesRadio`) ⇒
-                    renderPngFrames(resWidth, resHeight, outputDir, outputPrefix)
-                  case Some(`gifRadio`) ⇒
-                    renderAnimatedGif(resWidth, resHeight, framerate, outputDir, outputPrefix)
-                  case Some(`i420Radio`) ⇒ println("Rendering raw I420")
-                  case Some(`mp4Radio`) ⇒
-                    renderMP4Video(resWidth, resHeight, framerate, outputDir, outputPrefix)
-                  case _ ⇒ Dialog.showMessage(null, "Invalid output type",
-                                "Error: Invalid output type", Dialog.Message.Error)
+                val frameReceiver = radioGroup.selected match {
+                  case Some(`framesRadio`) ⇒ Some(new PngSequence(outputDir, outputPrefix))
+                  case Some(`gifRadio`) ⇒ Some(new AnimatedGif(framerate, outputDir, outputPrefix))
+                  case Some(`i420Radio`) ⇒ Some(new I420Video(resWidth, resHeight, outputDir, outputPrefix))
+                  case Some(`mp4Radio`) ⇒ Some(new Mp4Video(resWidth, resHeight, framerate, outputDir, outputPrefix))
+                  case _ ⇒
+                    Dialog.showMessage(null, "Invalid output type",
+                        "Error: Invalid output type", Dialog.Message.Error)
+                    None
                 }
+                for (receiver ← frameReceiver) renderFrames(resWidth, resHeight, receiver)
+
                 dialog.close()
               }
             }
@@ -170,18 +171,6 @@ class AnimationControls(plot: DomainPlot) {
     )
     worker.execute()
   }
-
-  def renderPngFrames(hRes: Int, vRes: Int, dir: File, prefix: String): Unit = {
-    renderFrames(hRes, vRes, new PngSequence(dir, prefix))
-  }
-
-  def renderAnimatedGif(hRes: Int, vRes: Int, fps: Int, dir: File, prefix: String): Unit = {
-    renderFrames(hRes, vRes, new AnimatedGif(fps, dir, prefix))
-  }
-
-  def renderMP4Video(hRes: Int, vRes: Int, fps: Int, dir: File, prefix: String): Unit = {
-    renderFrames(hRes, vRes, new Mp4Video(hRes, vRes, fps, dir, prefix))
-  }
 }
 
 object AnimationControls {
@@ -221,7 +210,7 @@ class PngSequence(dir: File, prefix: String) extends FrameReceiver {
 
 class AnimatedGif(fps: Int, dir: File, prefix: String) extends FrameReceiver {
   assert(dir.isDirectory)
-  val filesBuffer = new ListBuffer[File]
+  private val filesBuffer = new ListBuffer[File]
 
   def receiveFrame(img: BufferedImage, step: Int): Unit = {
     val outFile = File.createTempFile("dgview_frame_", ".png")
@@ -244,6 +233,20 @@ class AnimatedGif(fps: Int, dir: File, prefix: String) extends FrameReceiver {
           s"The `convert` command could not be executed", Dialog.Message.Warning)
     }
     for (file ← files) file.delete()
+  }
+}
+
+class I420Video(hRes: Int, vRes: Int, dir: File, prefix: String) extends FrameReceiver {
+  assert(dir.isDirectory)
+  private val encoder = new FrameEncoder(hRes, vRes)
+  private val out = new FileOutputStream(new File(dir, s"prefix.i420"))
+
+  def receiveFrame(img: BufferedImage, step: Int): Unit = {
+    encoder.encodeFrame(img, out)
+  }
+
+  def noMoreFrames(): Unit = {
+    out.close()
   }
 }
 

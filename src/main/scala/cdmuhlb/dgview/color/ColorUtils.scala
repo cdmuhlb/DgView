@@ -48,16 +48,62 @@ object Bt709Utils {
     else 1.099*pow(c, 0.45) - 0.099
   }
 
+  def forwardTransfer(c: Float): Float = {
+    if (c <= 0.018f) 4.5f*c
+    else 1.099f*pow(c, 0.45).toFloat - 0.099f
+  }
+
   def reverseTransfer(c: Double): Double = {
     if (c <= 0.081) c/4.5
-    else pow((c + 0.099)/(1.099), 1.0/0.45)
+    else pow((c + 0.099)/1.099, 1.0/0.45)
   }
 
-  def encode(e: Double): Int = {
-    rint(219.0*e + 16.0).toInt.min(254).max(1)
+  def reverseTransfer(c: Float): Float = {
+    if (c <= 0.081f) c/4.5f
+    else pow((c + 0.099f)/1.099f, 1.0/0.45).toFloat
   }
 
-  def decode(d: Int): Double = {
+  def eY(r: Double, g: Double, b: Double): Double = {
+    0.2126*r + 0.7152*g + 0.0722*b
+  }
+
+  def eY(r: Float, g: Float, b: Float): Float = {
+    0.2126f*r + 0.7152f*g + 0.0722f*b
+  }
+
+  def ePb(b: Double, eY: Double): Double = {
+    0.5*(b - eY) / 0.9278
+  }
+
+  def ePb(b: Float, eY: Float): Float = {
+    0.5f*(b - eY) / 0.9278f
+  }
+
+  def ePr(r: Double, eY: Double): Double = {
+    0.5*(r - eY) / 0.7874
+  }
+
+  def ePr(r: Float, eY: Float): Float = {
+    0.5f*(r - eY) / 0.7874f
+  }
+
+  def encodeY(eY: Double): Int = {
+    rint(219.0*eY + 16.0).toInt.min(254).max(1)
+  }
+
+  def encodeY(eY: Float): Int = {
+    rint(219.0f*eY + 16.0f).toInt.min(254).max(1)
+  }
+
+  def encodeC(eP: Double): Int = {
+    rint(224.0*eP + 128.0).toInt.min(254).max(1)
+  }
+
+  def encodeC(eP: Float): Int = {
+    rint(224.0f*eP + 128.0f).toInt.min(254).max(1)
+  }
+
+  def decodeY(d: Int): Double = {
     require((d >= 1) && (d <= 254))
     (d - 16)/219.0
   }
