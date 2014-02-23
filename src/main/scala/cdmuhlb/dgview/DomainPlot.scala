@@ -11,7 +11,7 @@ import scala.swing.event.{Key, KeyPressed, MouseEntered, MouseExited, MouseMoved
 import akka.actor.{ActorSystem, Inbox, Props}
 import cdmuhlb.dgview.actor.DomainRenderer
 
-class DomainPlot(doms: DomainSeq, pbar: ProgressBar) extends Component
+class DomainPlot(val doms: DomainSeq, pbar: ProgressBar) extends Component
     with RenderingRecipient {
   private val renderer = new DomainRenderer(this)
 
