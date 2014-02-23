@@ -1,8 +1,10 @@
 package cdmuhlb.dgview.app
 
 import java.awt.Dimension
+import java.awt.image.BufferedImage
 import java.beans.{PropertyChangeEvent, PropertyChangeListener}
 import java.io.File
+import javax.imageio.ImageIO
 import javax.swing.{BorderFactory, SwingWorker}
 import scala.swing.{Dialog, Swing}
 import scala.swing.{BoxPanel, Orientation}
@@ -10,7 +12,7 @@ import scala.swing.{Action, Button, ButtonGroup, RadioButton}
 import scala.swing.{Label, ProgressBar, TextField}
 import scala.swing.FileChooser
 import cdmuhlb.dgview.{DomainBounds, DomainPlot, PixelBounds, PixelMap, RenderSpec}
-import cdmuhlb.dgview.actor.AnimationWorker
+import cdmuhlb.dgview.actor.{AnimationWorker, FrameReceiver}
 import cdmuhlb.dgview.io.Html5Video
 
 class AnimationControls(plot: DomainPlot) {
@@ -33,7 +35,9 @@ class AnimationControls(plot: DomainPlot) {
         val i420Radio = new RadioButton("Raw video (I420)")
         val mp4Radio = new RadioButton("MP4 video (AVC)")
         framesRadio.selected = true
+        gifRadio.enabled = AnimationControls.hasImageMagickConvert
         i420Radio.enabled = false
+        mp4Radio.enabled = AnimationControls.hasX264
         val radioGroup = new ButtonGroup(framesRadio, gifRadio, i420Radio, mp4Radio)
 
         // Output location variables
@@ -136,15 +140,14 @@ class AnimationControls(plot: DomainPlot) {
     }
   }
 
-  def renderPngFrames(hRes: Int, vRes: Int, dir: File, prefix: String): Unit = {
+  def renderFrames(hRes: Int, vRes: Int, receiver: FrameReceiver): Unit = {
     val padding = 8
-    assert(dir.isDirectory)
     val field = plot.getField
     val colorMap = plot.getColorMap
     val specs = plot.doms.domains.values.map(dom ⇒
         RenderSpec(dom, field, colorMap, new PixelMap(
             PixelBounds(hRes, vRes), DomainBounds(dom), padding))).toList
-    val worker = new AnimationWorker(specs, dir)
+    val worker = new AnimationWorker(specs, receiver)
     worker.addPropertyChangeListener(
       new PropertyChangeListener {
         def propertyChange(evt: PropertyChangeEvent) {
@@ -167,16 +170,79 @@ class AnimationControls(plot: DomainPlot) {
     worker.execute()
   }
 
+  def renderPngFrames(hRes: Int, vRes: Int, dir: File, prefix: String): Unit = {
+    renderFrames(hRes, vRes, new PngSequence(dir, prefix))
+  }
+
   def renderAnimatedGif(hRes: Int, vRes: Int, fps: Int, dir: File, prefix: String): Unit = {
-    renderPngFrames(hRes, vRes, dir, prefix)
-    val delay = math.round(100.0f/fps)
-    println("To animate, run:")
-    println(s"$$ convert -delay 20 -loop 0 '$dir/frame_${plot.getField}_'*.png $prefix.gif")
+    renderFrames(hRes, vRes, new AnimatedGif(fps, dir, prefix))
   }
 
   def renderMP4Video(hRes: Int, vRes: Int, fps: Int, dir: File, prefix: String): Unit = {
-    renderPngFrames(hRes, vRes, dir, prefix)
-    val video = Html5Video(s"frame_${plot.getField}_", hRes, vRes, fps)
+    renderFrames(hRes, vRes, new Mp4Video(hRes, vRes, fps, dir, prefix))
+  }
+}
+
+object AnimationControls {
+  def hasImageMagickConvert: Boolean = {
+    import scala.sys.process._
+    var ans = false
+    val imageMagickLogger = ProcessLogger(
+        line ⇒ if (line.contains("ImageMagick")) ans = true)
+    try {
+      "convert --version" ! imageMagickLogger
+    } catch {
+      case e: Exception ⇒ Unit
+    }
+    ans
+  }
+
+  def hasX264: Boolean = {
+    import scala.sys.process._
+    val nullLogger = ProcessLogger(_ ⇒ Unit)
+    try {
+      "x264" ! nullLogger
+      true
+    } catch {
+      case e: Exception ⇒ false
+    }
+  }
+}
+
+class PngSequence(dir: File, prefix: String) extends FrameReceiver {
+  assert(dir.isDirectory)
+  def receiveFrame(img: BufferedImage, step: Int): Unit = {
+    val outFile = new File(dir, f"${prefix}_$step%04d.png")
+    ImageIO.write(img, "png", outFile)
+  }
+  def noMoreFrames(): Unit = Unit
+}
+
+class AnimatedGif(fps: Int, dir: File, prefix: String) extends FrameReceiver {
+  assert(dir.isDirectory)
+
+  def receiveFrame(img: BufferedImage, step: Int): Unit = {
+    val outFile = new File(dir, f"frame_$step%04d.png")
+    ImageIO.write(img, "png", outFile)
+  }
+
+  def noMoreFrames(): Unit = {
+    val delay = math.round(100.0f/fps)
+    println("To animate, run:")
+    println(s"$$ convert -delay 20 -loop 0 '$dir${File.separator}frame_'*.png $prefix.gif")
+  }
+}
+
+class Mp4Video(hRes: Int, vRes: Int, fps: Int, dir: File, prefix: String) extends FrameReceiver {
+  assert(dir.isDirectory)
+
+  def receiveFrame(img: BufferedImage, step: Int): Unit = {
+    val outFile = new File(dir, f"frame_$step%04d.png")
+    ImageIO.write(img, "png", outFile)
+  }
+
+  def noMoreFrames(): Unit = {
+    val video = Html5Video(s"frame_", hRes, vRes, fps)
     video.writeConversionScript(new File(dir, "make_html5_video.sh"), prefix)
     println("To animate, run:")
     println(s"$$ cd '$dir'; bash make_html5_video.sh")

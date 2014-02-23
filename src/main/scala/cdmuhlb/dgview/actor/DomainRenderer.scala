@@ -74,7 +74,12 @@ class DomainRenderer(plot: RenderingRecipient) {
   }
 }
 
-class AnimationWorker(specs: Seq[RenderSpec], dir: File)
+trait FrameReceiver {
+  def receiveFrame(img: BufferedImage, step: Int): Unit
+  def noMoreFrames(): Unit
+}
+
+class AnimationWorker(specs: Seq[RenderSpec], callback: FrameReceiver)
     extends SwingWorker[Unit, Unit] {
   override def doInBackground(): Unit = {
     val inbox = Inbox.create(RenderSystem.system)
@@ -135,8 +140,8 @@ class AnimationWorker(specs: Seq[RenderSpec], dir: File)
         g.draw(rect)
       }
 
-      val outFile = new File(dir, f"frame_${spec.field}_${step}%04d.png")
-      ImageIO.write(domImg, "png", outFile)
+      callback.receiveFrame(domImg, step)
     }
+    callback.noMoreFrames()
   }
 }
