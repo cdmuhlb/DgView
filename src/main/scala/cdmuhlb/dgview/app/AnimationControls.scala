@@ -261,7 +261,7 @@ class Mp4Video(hRes: Int, vRes: Int, fps: Int, dir: File, prefix: String) extend
   private val pipeOut = new PipedOutputStream(pipeIn)
 
   private val proc = {
-    val conf = ConfigFactory.load().getConfig("cdmuhlb.dgview.x264")
+    val conf = ConfigFactory.load().getConfig("dgview.x264")
     val x264Crf = conf.getString("crf");
     val x264Tune = conf.getString("tune");
     val x264Profile = conf.getString("profile");
@@ -285,8 +285,10 @@ class Mp4Video(hRes: Int, vRes: Int, fps: Int, dir: File, prefix: String) extend
         "--input-range", "tv",
         "--input-res", s"${hRes}x${vRes}",
         "-"))
-      val pio = new ProcessIO(BasicIO.transferFully(pipeIn, _),
-          BasicIO.toStdOut, BasicIO.toStdErr)
+      val pio = new ProcessIO(procSrc ⇒ {
+          BasicIO.transferFully(pipeIn, procSrc)
+          procSrc.close()
+        }, BasicIO.toStdOut, BasicIO.toStdErr)
       pb.run(pio)
   }
 
