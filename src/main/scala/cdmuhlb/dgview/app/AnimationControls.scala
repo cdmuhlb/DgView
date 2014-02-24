@@ -3,7 +3,7 @@ package cdmuhlb.dgview.app
 import java.awt.Dimension
 import java.awt.image.BufferedImage
 import java.beans.{PropertyChangeEvent, PropertyChangeListener}
-import java.io.{File, FileOutputStream}
+import java.io.{File, FileOutputStream, PipedInputStream, PipedOutputStream}
 import javax.imageio.ImageIO
 import javax.swing.{BorderFactory, SwingWorker}
 import scala.collection.mutable.ListBuffer
@@ -12,10 +12,11 @@ import scala.swing.{BoxPanel, Orientation}
 import scala.swing.{Action, Button, ButtonGroup, RadioButton}
 import scala.swing.{Label, ProgressBar, TextField}
 import scala.swing.FileChooser
+import com.typesafe.config.ConfigFactory
 import cdmuhlb.dgview.{DomainBounds, DomainPlot, PixelBounds, PixelMap, RenderSpec}
 import cdmuhlb.dgview.actor.{AnimationWorker, FrameReceiver}
 import cdmuhlb.dgview.io.Html5Video
-import cdmuhlb.dgview.media.FrameEncoder
+import cdmuhlb.dgview.media.{FrameEncoder, H264Level}
 
 class AnimationControls(plot: DomainPlot) {
   val progressBar = new ProgressBar
@@ -251,17 +252,50 @@ class I420Video(hRes: Int, vRes: Int, dir: File, prefix: String) extends FrameRe
 }
 
 class Mp4Video(hRes: Int, vRes: Int, fps: Int, dir: File, prefix: String) extends FrameReceiver {
+  import scala.sys.process._
   assert(dir.isDirectory)
+  private val encoder = new FrameEncoder(hRes, vRes)
+  // This pipe would not be necessary with Java's ProcessBuilder, but convenient
+  //   access to stdout is not available until Java SE 7.
+  private val pipeIn = new PipedInputStream(8192)
+  private val pipeOut = new PipedOutputStream(pipeIn)
+
+  private val proc = {
+    val conf = ConfigFactory.load().getConfig("cdmuhlb.dgview.x264")
+    val x264Crf = conf.getString("crf");
+    val x264Tune = conf.getString("tune");
+    val x264Profile = conf.getString("profile");
+    val x264KeyintSeconds = conf.getDouble("keyint-seconds");
+    val level = H264Level.findLevel(hRes, vRes, fps)
+    val pb = Process(List(
+        "x264", "--crf", x264Crf,
+        "--preset", "veryslow", "--tune", x264Tune,
+        "--fps", fps.toString,
+        "--keyint", math.round(x264KeyintSeconds*fps).toString,
+        "--profile", x264Profile, "--level", level.level,
+        "--vbv-maxrate", (if (x264Profile == "high") level.maxBitrateHigh else level.maxBitrate).toString,
+        "--vbv-bufsize", (if (x264Profile == "high") level.maxBitrateHigh else level.maxBitrate).toString,
+        "--non-deterministic",
+        //"--quiet", "--no-progress",
+        "--sar", "1:1", "--overscan", "show",
+        "--range", "tv", "--colorprim", "bt709", "--transfer", "bt709",
+        "--colormatrix", "bt709", "--chromaloc", "0",
+        "--output", (new File(dir, s"$prefix.mp4")).getCanonicalPath,
+        "--demuxer", "raw", "--input-csp", "i420", "--input-depth", "8",
+        "--input-range", "tv",
+        "--input-res", s"${hRes}x${vRes}",
+        "-"))
+      val pio = new ProcessIO(BasicIO.transferFully(pipeIn, _),
+          BasicIO.toStdOut, BasicIO.toStdErr)
+      pb.run(pio)
+  }
 
   def receiveFrame(img: BufferedImage, step: Int): Unit = {
-    val outFile = new File(dir, f"frame_$step%04d.png")
-    ImageIO.write(img, "png", outFile)
+    encoder.encodeFrame(img, pipeOut)
   }
 
   def noMoreFrames(): Unit = {
-    val video = Html5Video(s"frame_", hRes, vRes, fps)
-    video.writeConversionScript(new File(dir, "make_html5_video.sh"), prefix)
-    println("To animate, run:")
-    println(s"$$ cd '$dir'; bash make_html5_video.sh")
+    pipeOut.close()
+    proc.exitValue
   }
 }
