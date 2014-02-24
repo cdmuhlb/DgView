@@ -13,10 +13,10 @@ _DgView_ is written in Scala and requires an
 [SBT](http://www.scala-sbt.org/) launcher compatible with version 0.13.0 and a
 Java SE 6 (or later) JDK.
 
-_DgView_ can generate scripts to render animations of your data in both GIF and
-HTML5 video formats.  Generating GIFs requires the `convert` tool from
-ImageMagick.  Generating HTML5 video requires `ffmpeg`, `x264`, `MP4Box`, and
-`vpxenc`, in addition to a `bash` shell.
+_DgView_ can render animations of your data in both GIF and MP4 AVC formats.
+Generating GIFs requires the `convert` tool from ImageMagick.  Generating MP4
+AVC video requires `x264`.  _DgView_ can also render PNG frames and raw I420
+video without any additional tools.
 
 Configuration
 -------------
