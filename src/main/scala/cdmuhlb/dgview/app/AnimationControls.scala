@@ -101,7 +101,7 @@ class AnimationControls(plot: DomainPlot) {
             val outputPrefix = outputPrefixField.text.trim
             if (outputPrefix.isEmpty) {
               Dialog.showMessage(null, "Invalid filename prefix",
-                  "Error: Invalid filename prefix", Dialog.Message.Error)
+                  "Invalid filename prefix", Dialog.Message.Error)
             } else {
               val (resWidth, resHeight, framerate) = try {
                 (resWidthField.text.toInt, resHeightField.text.toInt,
@@ -111,21 +111,37 @@ class AnimationControls(plot: DomainPlot) {
               }
               if ((resWidth <= 0) || (resHeight <= 0) || (framerate <= 0)) {
                 Dialog.showMessage(null, "Invalid animation parameters",
-                  "Error: Invalid animation parameters", Dialog.Message.Error)
+                  "Invalid animation parameters", Dialog.Message.Error)
               } else {
                 val frameReceiver = radioGroup.selected match {
                   case Some(`framesRadio`) ⇒ Some(new PngSequence(outputDir, outputPrefix))
                   case Some(`gifRadio`) ⇒ Some(new AnimatedGif(framerate, outputDir, outputPrefix))
-                  case Some(`i420Radio`) ⇒ Some(new I420Video(resWidth, resHeight, outputDir, outputPrefix))
-                  case Some(`mp4Radio`) ⇒ Some(new Mp4Video(resWidth, resHeight, framerate, outputDir, outputPrefix))
+                  case Some(`i420Radio`) ⇒
+                    if ((resWidth%2 == 0) && (resHeight%2 == 0)) {
+                      Some(new I420Video(resWidth, resHeight, outputDir, outputPrefix))
+                    } else {
+                      Dialog.showMessage(null, "Width and height must be even",
+                          "Invalid animation parameters", Dialog.Message.Error)
+                      None
+                    }
+                  case Some(`mp4Radio`) ⇒
+                    if ((resWidth%2 == 0) && (resHeight%2 == 0)) {
+                      Some(new Mp4Video(resWidth, resHeight, framerate, outputDir, outputPrefix))
+                    } else {
+                      Dialog.showMessage(null, "Width and height must be even",
+                          "Invalid animation parameters", Dialog.Message.Error)
+                      None
+                    }
                   case _ ⇒
                     Dialog.showMessage(null, "Invalid output type",
-                        "Error: Invalid output type", Dialog.Message.Error)
+                        "Invalid output type", Dialog.Message.Error)
                     None
                 }
-                for (receiver ← frameReceiver) renderFrames(resWidth, resHeight, receiver)
 
-                dialog.close()
+                for (receiver ← frameReceiver) {
+                  renderFrames(resWidth, resHeight, receiver)
+                  dialog.close()
+                }
               }
             }
           })
@@ -227,11 +243,9 @@ class AnimatedGif(fps: Int, dir: File, prefix: String) extends FrameReceiver {
         (files.map(_.getCanonicalPath) :+ (new File(dir, s"$prefix.gif")).getCanonicalPath)
     try {
       val ret = cmd.!
-      if (ret != 0) Dialog.showMessage(null, "Error creating animated GIF",
-          s"The `convert` command exited with status $ret", Dialog.Message.Warning)
+      if (ret != 0) Dialog.showMessage(null, s"The `convert` command exited with status $ret", "Error creating animated GIF", Dialog.Message.Warning)
     } catch {
-      case e: Exception ⇒ Dialog.showMessage(null, "Error creating animated GIF",
-          s"The `convert` command could not be executed", Dialog.Message.Warning)
+      case e: Exception ⇒ Dialog.showMessage(null, s"The `convert` command could not be executed", "Error creating animated GIF", Dialog.Message.Warning)
     }
     for (file ← files) file.delete()
   }
