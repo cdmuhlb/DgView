@@ -224,7 +224,7 @@ class AnimatedGif(fps: Int, dir: File, prefix: String) extends FrameReceiver {
     val delay = math.round(100.0f/fps)
     val files = filesBuffer.result
     val cmd = List("convert", "-delay", delay.toString, "-loop", "0") :::
-        (files.map(_.getCanonicalPath) :+ s"$prefix.gif")
+        (files.map(_.getCanonicalPath) :+ (new File(dir, s"$prefix.gif")).getCanonicalPath)
     try {
       val ret = cmd.!
       if (ret != 0) Dialog.showMessage(null, "Error creating animated GIF",
