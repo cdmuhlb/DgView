@@ -21,8 +21,8 @@ object SRgbColor {
       SRgbColor(decode(r), decode(g), decode(b))
 
   def fromArgb(argb: Int): SRgbColor = {
-    SRgbColor(decode((argb>>>16) & 0xff), decode((argb>>>16) & 0xff),
-        decode((argb>>>16) & 0xff))
+    SRgbColor(decode((argb>>>16) & 0xff), decode((argb>>>8) & 0xff),
+        decode(argb & 0xff))
   }
 
   // TODO
